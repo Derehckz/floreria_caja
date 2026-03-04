@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Caja diaria de Florería Elizabeth: efectivo, Transbank, gastos y resumen del día. Respaldo y resumen mensual.">
+<title>Florería Elizabeth · Caja</title>
+<meta name="theme-color" content="#4a1625">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ════════ HEADER ════════ -->
+<header class="app-header">
+  <div class="brand-logo">🌸</div>
+      <div class="brand-info">
+    <h1>Florería Elizabeth</h1>
+    <p>Caja diaria sencilla para usar todos los días</p>
+  </div>
+  <div class="header-date-nav" id="date-nav">
+    <button class="dn-btn" onclick="cambiarDia(-1)" aria-label="Día anterior" title="Día anterior">‹</button>
+    <div class="dn-center" onclick="irAHoy()" aria-label="Ir al día de hoy" title="Ir al día de hoy">
+      <strong id="dn-day">—</strong>
+      <span><span id="dn-date">—</span><span id="dn-today-dot" class="today-pip" style="display:none"></span></span>
+    </div>
+    <button class="dn-btn" id="btn-sig" onclick="cambiarDia(1)" aria-label="Día siguiente" title="Día siguiente">›</button>
+  </div>
+</header>
+
+<!-- Solo lectura -->
+<div class="ro-banner" id="ro-banner">
+  <span>📅 Estás viendo un día pasado — puedes editar y corregir</span>
+  <button onclick="irAHoy()">Ir a hoy</button>
+</div>
+
+<!-- ════════ TABS ════════ -->
+<div class="tab-bar" role="tablist" aria-label="Secciones principales">
+  <button class="tab-btn active" id="tab-caja" role="tab" aria-selected="true" aria-controls="view-caja" onclick="setTab('caja')" aria-label="Ver caja del día" title="Ver caja del día">
+    <span class="tab-icon">📊</span>Caja
+  </button>
+  <button class="tab-btn" id="tab-mes" role="tab" aria-selected="false" aria-controls="view-mes" onclick="setTab('mes')" aria-label="Ver resumen del mes" title="Ver resumen del mes">
+    <span class="tab-icon">📅</span>Mes
+  </button>
+  <button class="tab-btn" id="tab-backup" role="tab" aria-selected="false" aria-controls="view-backup" onclick="setTab('backup')" aria-label="Ver respaldo y compartir" title="Ver respaldo y compartir">
+    <span class="tab-icon">💾</span>Respaldo
+  </button>
+</div>
+
+<!-- ════════ BODY ════════ -->
+<div class="app-body" id="app-body">
+
+  <!-- ══════ VISTA CAJA ══════ -->
+  <div class="view active" id="view-caja" role="tabpanel" aria-labelledby="tab-caja">
+
+    <div class="pending-banner" id="pending-banner"></div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi kpi-ef">
+        <div class="kpi-lbl">Efectivo (billetes)</div>
+        <div class="kpi-val" id="k-ef">$0</div>
+        <div class="kpi-sub">Del día</div>
+      </div>
+      <div class="kpi kpi-tb">
+        <div class="kpi-lbl">Tarjeta / Transbank</div>
+        <div class="kpi-val" id="k-tb">$0</div>
+        <div class="kpi-sub">Del día</div>
+      </div>
+      <div class="kpi kpi-gs">
+        <div class="kpi-lbl">Plata que salió</div>
+        <div class="kpi-val" id="k-gs">$0</div>
+        <div class="kpi-sub" id="k-gs-n">0 items</div>
+      </div>
+      <div class="kpi kpi-nt">
+        <div class="kpi-lbl">Resultado del día</div>
+        <div class="kpi-val" id="k-nt">$0</div>
+        <div class="kpi-sub" id="k-nt-sub">Ingresos − Gastos</div>
+      </div>
+    </div>
+    <div class="kpi-context" id="kpi-context" aria-live="polite"></div>
+
+    <div class="caja-2col">
+      <!-- Efectivo -->
+      <div class="card">
+        <div class="card-head">
+          <div class="ch-icon ch-ef">💵</div>
+          <div><h2>Efectivo</h2><p>Total vendido en efectivo</p></div>
+        </div>
+        <div class="card-body">
+          <div class="big-amount-wrap">
+            <div class="big-lbl">Registrado</div>
+            <div class="big-val col-ef" id="ef-disp">$0</div>
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Total efectivo del día</label>
+              <input type="number" id="ef-in" placeholder="Ej: 85.000 (monto final en caja)" min="0" step="1000">
+            </div>
+            <button class="btn btn-sm btn-green" onclick="setMonto('ef')">Guardar</button>
+          </div>
+          <div class="last-saved" id="ef-last"></div>
+        </div>
+      </div>
+
+      <!-- Transbank -->
+      <div class="card">
+        <div class="card-head">
+          <div class="ch-icon ch-tb">💳</div>
+          <div><h2>Transbank</h2><p>Total vendido con tarjeta</p></div>
+        </div>
+        <div class="card-body">
+          <div class="big-amount-wrap">
+            <div class="big-lbl">Registrado</div>
+            <div class="big-val col-tb" id="tb-disp">$0</div>
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Total Transbank del día</label>
+              <input type="number" id="tb-in" placeholder="Ej: 120.000 (según cierre Transbank)" min="0" step="1000">
+            </div>
+            <button class="btn btn-sm btn-blue" onclick="setMonto('tb')">Guardar</button>
+          </div>
+          <div class="last-saved" id="tb-last"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gastos -->
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon ch-gs">🧾</div>
+        <div><h2>Gastos del Día</h2><p>Cada egreso con descripción</p></div>
+      </div>
+      <div class="card-body">
+        <div class="field field-gastos-desc">
+          <label>Descripción</label>
+          <input type="text" id="gs-desc" placeholder="Flores proveedor, Delivery, Arriendo…" maxlength="60">
+        </div>
+        <div class="input-row input-row-gastos">
+          <div class="field">
+            <label>Monto ($)</label>
+            <input type="number" id="gs-mn" placeholder="0" min="0" step="100">
+          </div>
+          <button class="btn btn-sm btn-rose" onclick="addGasto()">＋ Agregar</button>
+        </div>
+        <div class="g-list" id="gs-list">
+          <div class="empty-note">Sin gastos registrados aún 🌿</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nota del día -->
+    <div class="card nota-wrap">
+      <div class="card-head">
+        <div class="ch-icon ch-cfg">📝</div>
+        <div><h2>Nota del Día</h2><p>Observaciones, eventos especiales</p></div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <textarea id="nota-in" placeholder="Ej: Llegó pedido grande de rosas, día de mucho tráfico, lluvia…"></textarea>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="guardarNota()">Guardar nota</button>
+        <div id="nota-disp"></div>
+      </div>
+    </div>
+
+    <!-- Resumen financiero -->
+    <div class="rc-card">
+      <div class="rc-head">
+        <span>📊</span>
+        <h2>Resultado del Día</h2>
+        <span class="rc-date" id="rc-date">—</span>
+        <span class="rc-status-chip" id="rc-status-chip">Día pendiente</span>
+      </div>
+      <div class="rc-body">
+        <div class="rc-line">
+          <div class="rc-line-lbl"><span class="rcdot rcdot-g"></span>Efectivo</div>
+          <span class="rc-line-val rcv-g" id="rc-ef">$0</span>
+        </div>
+        <div class="rc-line">
+          <div class="rc-line-lbl"><span class="rcdot rcdot-b"></span>Transbank</div>
+          <span class="rc-line-val rcv-b" id="rc-tb">$0</span>
+        </div>
+        <div class="rc-sep"></div>
+        <div class="rc-subtotal"><span>Total Ingresos</span><span id="rc-ing">$0</span></div>
+        <div class="rc-line">
+          <div class="rc-line-lbl"><span class="rcdot rcdot-r"></span>Gastos <span id="rc-gn" class="rc-gn-count"></span></div>
+          <span class="rc-line-val rcv-r" id="rc-gs">$0</span>
+        </div>
+        <div class="rc-neto-box">
+          <div>
+            <div class="rc-neto-lbl">Balance Neto</div>
+            <div class="rc-neto-sub" id="rc-estado">—</div>
+          </div>
+          <div class="rc-neto-val nv-zero" id="rc-neto">$0</div>
+        </div>
+        <div class="rc-bar-wrap">
+          <div class="rc-bar-lbl"><span>Margen</span><span id="rc-mrg-pct">0%</span></div>
+          <div class="rc-bar-track"><div class="rc-bar-fill" id="rc-mrg-fill" style="width:0%"></div></div>
+        </div>
+        <div class="rc-week-summary" id="rc-week-summary"></div>
+        <div class="rc-quick-links">
+          <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(1)">Corregir efectivo</button>
+          <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(2)">Corregir tarjeta</button>
+          <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(3)">Agregar / corregir gastos</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="caja-actions caja-step-pane caja-step-4">
+      <button class="btn btn-md btn-ghost" id="btn-limpiar" onclick="confirmarLimpiar()" aria-label="Limpiar todos los datos de este día" title="Limpiar todos los datos de este día">🗑️ Limpiar día</button>
+      <button class="btn btn-md btn-rose btn-copy-resumen" onclick="copiarResumen()" aria-label="Copiar el resumen de caja" title="Copiar el resumen de caja">📋 Copiar resumen</button>
+      <button class="btn btn-md btn-green btn-cerrar-dia" id="btn-cerrar-dia" onclick="confirmarCierreDia()" aria-label="Marcar este día como cerrado" title="Marcar este día como cerrado">✅ Confirmar cierre del día</button>
+    </div>
+
+  </div><!-- /view-caja -->
+
+  <!-- ══════ VISTA MES ══════ -->
+  <div class="view" id="view-mes" role="tabpanel" aria-labelledby="tab-mes">
+
+    <div class="mes-nav">
+      <button class="btn btn-ghost" onclick="cambiarMes(-1)">‹</button>
+      <h2 id="mes-titulo">—</h2>
+      <button class="btn btn-ghost" id="btn-mes-sig" onclick="cambiarMes(1)">›</button>
+    </div>
+
+    <div class="mes-cierres-resumen">
+      <span id="mes-cierres-info">—</span>
+    </div>
+
+    <div class="mes-cut">
+      <span><strong>Día de corte</strong> (1–31):</span>
+      <input type="number" id="mes-corte-dia" min="1" max="31" oninput="setMesCorteDia(this.value)">
+      <span id="mes-corte-resumen">Verás el balance acumulado del mes hasta el día elegido.</span>
+    </div>
+
+    <!-- KPIs mes -->
+    <div class="mes-kpi">
+      <div class="mes-kpi-item mk-ing">
+        <div class="mk-lbl">Total Ingresos</div>
+        <div class="mk-val" id="mk-ing">$0</div>
+        <div class="mk-sub" id="mk-ing-sub">— días con datos</div>
+      </div>
+      <div class="mes-kpi-item mk-gas">
+        <div class="mk-lbl">Total Gastos</div>
+        <div class="mk-val" id="mk-gas">$0</div>
+        <div class="mk-sub" id="mk-gas-sub">0 registros</div>
+      </div>
+      <div class="mes-kpi-item mk-neto">
+        <div class="mk-lbl">Lo que ganaste (neto)</div>
+        <div class="mk-val" id="mk-neto">$0</div>
+        <div class="mk-sub" id="mk-neto-sub">Margen 0%</div>
+      </div>
+      <div class="mes-kpi-item mk-dias">
+        <div class="mk-lbl">Mejor día</div>
+        <div class="mk-val" id="mk-mejor-val">—</div>
+        <div class="mk-sub" id="mk-mejor-dia">Sin datos</div>
+      </div>
+    </div>
+    <div class="mes-resumen-negocio" id="mes-resumen-negocio" aria-live="polite"></div>
+
+    <div class="mes-notas-card">
+      <h3>Notas importantes del mes</h3>
+      <div id="mes-notas-list" class="mes-notas-list">
+        <div class="mes-notas-empty">Aún no hay notas guardadas este mes.</div>
+      </div>
+    </div>
+
+    <div class="mes-advanced-toggle">
+      <button class="btn btn-full btn-ghost" id="btn-mes-adv" onclick="toggleMesAdvanced()">Ver análisis avanzado</button>
+    </div>
+
+    <div id="mes-advanced" class="mes-advanced hidden">
+    <!-- Comparación Ef vs TB -->
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon ch-tb">⚖️</div>
+        <div><h2>Efectivo vs Transbank</h2><p>Composición de ingresos del mes</p></div>
+      </div>
+      <div class="card-body comp-wrap">
+        <div class="comp-bar-wrap">
+          <div class="comp-labels">
+            <span style="color:var(--green);font-weight:600" id="comp-ef-pct">50%</span>
+            <span style="color:var(--blue);font-weight:600"  id="comp-tb-pct">50%</span>
+          </div>
+          <div class="comp-track">
+            <div class="comp-ef" id="comp-ef-bar" style="width:50%"></div>
+            <div class="comp-tb" id="comp-tb-bar" style="width:50%"></div>
+          </div>
+        </div>
+        <div class="comp-legend">
+          <span><span class="leg-dot" style="background:var(--green)"></span>Efectivo <strong id="comp-ef-monto">$0</strong></span>
+          <span><span class="leg-dot" style="background:var(--blue)"></span>Transbank <strong id="comp-tb-monto">$0</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico semanal -->
+    <div class="chart-wrap">
+      <div class="chart-title">Ingresos por Semana</div>
+      <div class="bar-chart" id="bar-chart">
+        <div class="bar-col"><div class="bar-outer" style="height:120px"><div class="bar-inner" style="height:0%"></div></div><div class="bar-lbl">—</div></div>
+      </div>
+    </div>
+
+    <!-- Tabla semanas -->
+    <div class="card card-semanas">
+      <div class="card-head">
+        <div class="ch-icon ch-cfg">📋</div>
+        <div><h2>Resumen Semanal</h2><p>Desglose por semana del mes</p></div>
+      </div>
+      <div class="card-body card-body-semanas">
+        <table class="semanas-table" id="semanas-table">
+          <thead><tr><th>Semana</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr></thead>
+          <tbody id="semanas-body"></tbody>
+        </table>
+        <div class="semanas-legend">Las semanas se calculan de lunes a domingo dentro del mes seleccionado.</div>
+      </div>
+    </div>
+
+    <!-- Top 3 días -->
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon ch-cfg">🏆</div>
+        <div><h2>Mejores Días del Mes</h2><p>Top 3 por ingresos totales</p></div>
+      </div>
+      <div class="card-body">
+        <div class="top-dias" id="top-dias">
+          <div class="empty-note">Sin datos para este mes</div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /mes-advanced -->
+
+    <!-- Lista de días del mes -->
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon ch-cfg">📆</div>
+        <div><h2>Días del Mes</h2><p>Toca un día para verlo en la caja diaria</p></div>
+      </div>
+      <div class="card-body card-body-dias">
+        <table class="dias-table">
+          <thead>
+            <tr>
+              <th>Día</th>
+              <th>Ingresos</th>
+              <th>Gastos</th>
+              <th>Neto</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="dias-mes-body">
+            <tr>
+              <td colspan="4" style="text-align:center;padding:20px;color:var(--ink-soft);font-style:italic">
+                Sin datos para este mes
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="dias-legend">Los datos históricos se guardan solos. Solo toca un día para abrirlo en la pestaña Caja.</div>
+      </div>
+    </div>
+
+  </div><!-- /view-mes -->
+
+  <!-- ══════ VISTA BACKUP ══════ -->
+  <div class="view" id="view-backup" role="tabpanel" aria-labelledby="tab-backup">
+
+    <!-- Stats -->
+      <div class="stats-info">
+      <h3>Estado del almacenamiento</h3>
+      <div class="stats-row"><span>Días registrados</span><span id="st-dias">0</span></div>
+      <div class="stats-row"><span>Primer registro</span><span id="st-inicio">—</span></div>
+      <div class="stats-row"><span>Último registro</span><span id="st-ultimo">—</span></div>
+      <div class="stats-row"><span>Tamaño aprox.</span><span id="st-size">0 KB</span></div>
+      <div class="stats-row"><span>Último backup</span><span id="st-backup">Nunca</span></div>
+    </div>
+
+    <!-- Backup / Restore -->
+    <div class="backup-grid">
+
+      <div class="backup-card">
+        <div class="bk-icon">⬇️</div>
+        <div class="bk-title">Descargar Respaldo</div>
+        <div class="bk-desc">Genera un archivo <strong>.json</strong> con todos tus días, notas y cierres. Guárdalo en Google Drive o envíalo por WhatsApp.</div>
+        <button class="btn btn-full btn-rose" onclick="descargarBackup()" aria-label="Descargar archivo de respaldo" title="Descargar archivo de respaldo">Descargar backup</button>
+        <div class="bk-info">Se descarga en la tablet. Luego puedes subirlo a Drive.</div>
+      </div>
+
+      <div class="backup-card">
+        <div class="bk-icon">⬆️</div>
+        <div class="bk-title">Restaurar Respaldo</div>
+        <div class="bk-desc">Selecciona un archivo <strong>.json</strong> previamente descargado para restaurar todos tus datos en este dispositivo.</div>
+        <label class="btn btn-full btn-ghost" style="cursor:pointer;text-align:center" aria-label="Seleccionar archivo de respaldo" title="Seleccionar archivo de respaldo">
+          Seleccionar archivo
+          <input type="file" accept=".json" id="restore-input" style="display:none" onchange="restaurarBackup(this)">
+        </label>
+        <div class="bk-info">⚠️ Reemplazará todos los datos actuales.</div>
+      </div>
+
+    </div>
+
+    <!-- Compartir por WhatsApp -->
+    <div class="card">
+      <div class="card-head">
+        <div class="ch-icon ch-gs">📱</div>
+        <div><h2>Compartir Resumen</h2><p>Enviar el resumen del día por WhatsApp</p></div>
+      </div>
+      <div class="card-body">
+        <p class="whatsapp-desc">Genera el resumen del día activo y lo abre directamente en WhatsApp para que puedas enviárselo a quien quieras.</p>
+        <button class="btn btn-full btn-whatsapp" onclick="compartirWhatsApp()" aria-label="Enviar resumen del día por WhatsApp" title="Enviar resumen del día por WhatsApp">
+          💬 Enviar por WhatsApp
+        </button>
+      </div>
+    </div>
+
+    <div class="backup-spacer"></div>
+  </div><!-- /view-backup -->
+
+</div><!-- /app-body -->
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-limpiar-txt">
+    <h3 id="modal-title">¿Limpiar este día? 🗑️</h3>
+    <p id="modal-limpiar-txt">Se eliminarán todos los registros de este día. Esta acción no se puede deshacer.</p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-rose" onclick="limpiar()">Sí, limpiar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+<script src="tests.js"></script>
+
+</body>
+</html>
