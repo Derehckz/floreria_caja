@@ -15,7 +15,8 @@ const state = {
   paso2Guardado: false,
   lastSavedAt: null,
   guardadoTimeout: null,
-  S: null
+  S: null,
+  historicoSort: { by: 'fecha', dir: -1 }
 };
 state.curMes = { y: state.cur.y, m: state.cur.m };
 state.S = loadDay(state.cur);
@@ -53,9 +54,7 @@ function updateDateHeader() {
   document.getElementById('dn-day').textContent = DIAS_ES[jsDate.getDay()];
   document.getElementById('dn-date').textContent = `${state.cur.d} ${MESES_SH[state.cur.m - 1]} ${state.cur.y}`;
   document.getElementById('btn-sig').disabled = isToday(state.cur);
-
-  const ro = document.getElementById('ro-banner');
-  isToday(state.cur) ? ro.classList.remove('show') : ro.classList.add('show');
+  /* ro-banner lo controla solo renderCaja() para no duplicar lógica de notificaciones */
 
   document.getElementById('rc-date').textContent = `${state.cur.d}/${state.cur.m}/${state.cur.y}`;
 
@@ -93,7 +92,7 @@ function cambiarDia(d) {
   state.paso1Guardado = !!state.S.efHora;
   state.paso2Guardado = !!state.S.tbHora;
   document.getElementById('nota-in').value = state.S.nota || '';
-  state.state.cajaPaso = 1;
+  state.cajaPaso = 1;
   updateDateHeader();
   renderCaja();
 }
@@ -103,7 +102,7 @@ function irAHoy() {
   state.paso1Guardado = !!state.S.efHora;
   state.paso2Guardado = !!state.S.tbHora;
   document.getElementById('nota-in').value = state.S.nota || '';
-  state.state.cajaPaso = 1;
+  state.cajaPaso = 1;
   updateDateHeader();
   renderCaja();
 }
@@ -135,10 +134,12 @@ function setTab(name) {
   }
   const appBody = document.getElementById('app-body');
   if (appBody) appBody.scrollTo(0, 0);
-  const roBanner = document.getElementById('ro-banner');
-  if (roBanner) {
-    roBanner.classList.remove('show');
-    if (name === 'caja' && !isToday(state.cur)) roBanner.classList.add('show');
+  document.body.classList.toggle('tab-caja-active', name === 'caja');
+  const notifBtn = document.getElementById('header-notif-btn');
+  if (notifBtn && name !== 'caja') cerrarNotifPanel();
+  /* Al entrar a Caja siempre refrescamos vista y notificaciones para que campanita y badge sean coherentes */
+  if (name === 'caja') {
+    renderCaja();
   }
 }
 
@@ -149,6 +150,54 @@ function toggleRespaldo() {
   } else {
     setTab('backup');
   }
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  const btn = document.getElementById('header-notif-btn');
+  if (!panel || !btn) return;
+  const isOpen = panel.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+  panel.setAttribute('aria-hidden', !isOpen);
+}
+
+function cerrarNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  const btn = document.getElementById('header-notif-btn');
+  if (panel) {
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+  }
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+/**
+ * Actualiza el badge de la campanita y el panel de avisos.
+ * Regla: solo debe llamarse cuando las notificaciones ya tienen .show correcto
+ * (p. ej. al final de renderCaja o tras init). No modifica quién tiene .show.
+ */
+function updateNotifPanelUI() {
+  const ro = document.getElementById('ro-banner');
+  const noAbri = document.getElementById('caja-no-abri-wrap');
+  const estado = document.getElementById('estado-general');
+  const pending = document.getElementById('pending-banner');
+  const night = document.getElementById('night-reminder');
+  const count = [ro, noAbri, estado, pending, night].filter(el => el && el.classList.contains('show')).length;
+  const badge = document.getElementById('header-notif-badge');
+  const notifBtn = document.getElementById('header-notif-btn');
+  const empty = document.getElementById('notif-panel-empty');
+  const list = document.getElementById('caja-notifications');
+  if (badge) {
+    badge.textContent = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
+    badge.classList.toggle('has-count', count > 0);
+  }
+  if (notifBtn) {
+    const avisosTxt = count === 0 ? 'Avisos' : count === 1 ? '1 aviso' : count + ' avisos';
+    notifBtn.setAttribute('title', avisosTxt);
+    notifBtn.setAttribute('aria-label', count > 0 ? 'Ver ' + avisosTxt : 'Ver avisos y notificaciones');
+  }
+  if (empty) empty.classList.toggle('show', count === 0);
+  if (list) list.style.display = count > 0 ? 'flex' : 'none';
 }
 
 /* ──────────────────────────────────────────────────
@@ -197,14 +246,14 @@ function guardarMontoYSiguiente(tipo) {
 
   if (!isNaN(v) && v >= 0) {
     if (setMonto(tipo)) {
-      state.state.cajaPaso = pasoSiguiente;
+      state.cajaPaso = pasoSiguiente;
       actualizarCajaWizardUI();
       scrollAPaso(pasoSiguiente);
     }
     return;
   }
   if (yaGuardado || (typeof valorGuardado === 'number' && valorGuardado >= 0)) {
-    state.state.cajaPaso = pasoSiguiente;
+    state.cajaPaso = pasoSiguiente;
     actualizarCajaWizardUI();
     scrollAPaso(pasoSiguiente);
     return;
@@ -305,7 +354,7 @@ function renderCajaKPIs(resumen) {
   document.getElementById('k-ef').textContent = fmt(state.S.ef||0);
   document.getElementById('k-tb').textContent = fmt(state.S.tb||0);
   document.getElementById('k-gs').textContent = fmt(totG);
-  document.getElementById('k-gs-n').textContent = gastos.length + (gastos.length===1?' item':' items');
+  document.getElementById('k-gs-n').textContent = gastos.length === 0 ? '0 egresos' : (gastos.length === 1 ? '1 egreso' : gastos.length + ' egresos');
 
   const heroEl = document.getElementById('kpi-hero-val');
   if (heroEl) {
@@ -316,8 +365,9 @@ function renderCajaKPIs(resumen) {
     else heroEl.classList.add('negative');
   }
   const heroLabel = document.getElementById('kpi-hero-label');
-  if (heroLabel) heroLabel.textContent = isToday(state.cur) ? 'Resultado de hoy' : 'Resultado del día';
+  if (heroLabel) heroLabel.textContent = isToday(state.cur) ? 'Lo que te queda hoy' : 'Resultado del día';
 
+  const ctxWrap = document.getElementById('kpi-context-wrap');
   const ctxEl = document.getElementById('kpi-context');
   const chipEl = document.getElementById('kpi-chip');
   const diaLabel = isToday(state.cur) ? 'Hoy' : 'Este día';
@@ -340,6 +390,7 @@ function renderCajaKPIs(resumen) {
         chipEl.textContent = pctChip > 0 ? diaLabel + ' +' + pctChip + '% vs promedio' : pctChip < 0 ? diaLabel + ' ' + pctChip + '% vs promedio' : diaLabel + ' al promedio';
         chipEl.classList.add('show');
       } else if (chipEl) chipEl.classList.remove('show');
+      if (ctxWrap) ctxWrap.classList.add('show');
     } else {
       ctxEl.textContent = '';
       ctxEl.classList.remove('show');
@@ -347,8 +398,12 @@ function renderCajaKPIs(resumen) {
         if (state.cur.d === 1) {
           chipEl.textContent = 'Primer día del mes';
           chipEl.classList.add('show');
-        } else chipEl.classList.remove('show');
-      }
+          if (ctxWrap) ctxWrap.classList.add('show');
+        } else {
+          chipEl.classList.remove('show');
+          if (ctxWrap) ctxWrap.classList.remove('show');
+        }
+      } else if (ctxWrap) ctxWrap.classList.remove('show');
     }
   }
 }
@@ -479,10 +534,12 @@ function renderCajaPasoResultado(resumen) {
   const weekDetail = document.getElementById('rc-week-detail');
   const lunesLabel = `${desdeObj.d}/${desdeObj.m}`;
   const hoyLabel = `${state.cur.d}/${state.cur.m}`;
+  const weekSection = document.getElementById('rc-week-section');
   if (acIng === 0 && acGs === 0) {
     if (weekEl) weekEl.textContent = '';
     if (weekToggle) weekToggle.style.display = 'none';
     if (weekDetail) weekDetail.classList.remove('has-data');
+    if (weekSection) weekSection.style.display = 'none';
   } else {
     if (weekEl) {
       weekEl.innerHTML =
@@ -491,6 +548,7 @@ function renderCajaPasoResultado(resumen) {
     }
     if (weekToggle) weekToggle.style.display = '';
     if (weekDetail) weekDetail.classList.add('has-data');
+    if (weekSection) weekSection.style.display = 'block';
   }
 
   const sparkEl = document.getElementById('rc-sparkline');
@@ -569,6 +627,12 @@ function renderEstadoGeneral() {
   el.classList.toggle('estado-general-cerrado', state.S.cerrado);
 }
 
+/**
+ * Render de la vista Caja y de las notificaciones del panel.
+ * Es la ÚNICA función que asigna .show a ro-banner, caja-no-abri-wrap, estado-general,
+ * pending-banner y night-reminder. Al final siempre llama updateNotifPanelUI() para
+ * que el badge de la campanita coincida con el número de avisos visibles.
+ */
 function renderCaja() {
   const resumen = calcularResumenDia(state.S);
   const { totI, totG } = resumen;
@@ -583,11 +647,18 @@ function renderCaja() {
   const atajo = document.getElementById('caja-atajo-revisar');
   const ctaCierre = document.getElementById('caja-cta-cierre');
   const tieneEfTb = (state.S.ef > 0 || state.S.tb > 0) && !state.S.cerrado;
-  if (atajo) atajo.style.display = tieneEfTb ? 'block' : 'none';
-  if (ctaCierre) ctaCierre.style.display = tieneEfTb ? 'none' : 'block';
+  if (atajo) atajo.style.display = 'none'; /* FAB es la entrada única */
+  if (ctaCierre) ctaCierre.style.display = 'none'; /* FAB flotante reemplaza el CTA inline */
   const noAbriWrap = document.getElementById('caja-no-abri-wrap');
-  if (noAbriWrap) noAbriWrap.style.display = (!state.S.cerrado && totI === 0 && totG === 0) ? 'flex' : 'none';
+  const mostrarNoAbri = !state.S.cerrado && totI === 0 && totG === 0;
+  if (noAbriWrap) {
+    noAbriWrap.style.display = mostrarNoAbri ? 'flex' : 'none';
+    noAbriWrap.classList.toggle('show', mostrarNoAbri);
+  }
+  const roBanner = document.getElementById('ro-banner');
+  if (roBanner) roBanner.classList.toggle('show', !isToday(state.cur));
   actualizarCajaWizardUI();
+  updateNotifPanelUI();
 }
 
 function renderRecordatorioNocturno() {
@@ -634,38 +705,47 @@ function irAMesActual() {
 
 /** Estado vacío del mes: un solo lugar para no olvidar ningún elemento. */
 function setMesEmptyState() {
-  const ids = ['mk-ing', 'mk-gas', 'mk-neto'];
+  const ids = ['mk-ing', 'mk-gas', 'mk-hero-neto'];
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '$0'; });
+  const heroNeto = document.getElementById('mk-hero-neto');
+  if (heroNeto) { heroNeto.classList.remove('positive', 'negative'); heroNeto.classList.add('zero'); }
+  const heroDesc = document.getElementById('mk-hero-desc');
+  if (heroDesc) heroDesc.textContent = 'Ingresos del mes menos gastos del mes';
   const mkMejor = document.getElementById('mk-mejor-val');
   if (mkMejor) mkMejor.textContent = '—';
   document.getElementById('mk-ing-sub').textContent  = '0 días con datos';
   document.getElementById('mk-gas-sub').textContent  = '0 registros';
-  document.getElementById('mk-neto-sub').textContent = 'Margen 0%';
   document.getElementById('mk-mejor-dia').textContent = 'Sin datos';
 
-  const resumenNegEl = document.getElementById('mes-resumen-negocio');
-  if (resumenNegEl) { resumenNegEl.innerHTML = ''; resumenNegEl.classList.remove('show'); }
-
-  document.getElementById('comp-ef-bar').style.width = '50%';
-  document.getElementById('comp-tb-bar').style.width = '50%';
-  document.getElementById('comp-ef-pct').textContent = '50%';
-  document.getElementById('comp-tb-pct').textContent = '50%';
-  document.getElementById('comp-ef-monto').textContent = '$0';
-  document.getElementById('comp-tb-monto').textContent = '$0';
-  document.getElementById('semanas-body').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--ink-soft);font-style:italic">Sin datos para este mes</td></tr>';
-  document.getElementById('top-dias').innerHTML = '<div class="empty-note">Sin datos para este mes</div>';
-  document.getElementById('bar-chart').innerHTML = '<div style="color:var(--ink-soft);font-size:.8rem;font-style:italic;padding:20px;width:100%;text-align:center">Sin datos</div>';
+  const semanasBody = document.getElementById('semanas-body');
+  const topDias = document.getElementById('top-dias');
+  if (semanasBody) semanasBody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--ink-soft);font-style:italic">Sin datos para este mes</td></tr>';
+  if (topDias) topDias.innerHTML = '<div class="empty-note">Sin datos para este mes</div>';
 
   const corteInput = document.getElementById('mes-corte-dia');
   if (corteInput) {
     corteInput.value = '';
     corteInput.setAttribute('max', new Date(state.curMes.y, state.curMes.m, 0).getDate());
   }
-  const corteLabel = document.getElementById('mes-corte-resumen');
-  if (corteLabel) corteLabel.textContent = 'Sin datos en este mes.';
+  const corteHint = document.getElementById('mes-corte-resumen');
+  if (corteHint) corteHint.textContent = 'Sin datos en este mes.';
+  const wrap = document.getElementById('mes-totales-result-wrap');
+  if (wrap) wrap.classList.remove('show');
+  const diaEl = document.getElementById('mes-totales-dia');
+  const ingEl = document.getElementById('mes-totales-ing');
+  const gsEl = document.getElementById('mes-totales-gs');
+  const netoEl = document.getElementById('mes-totales-neto');
+  const mrgEl = document.getElementById('mes-totales-mrg');
+  if (diaEl) diaEl.textContent = '—';
+  if (ingEl) ingEl.textContent = '$0';
+  if (gsEl) gsEl.textContent = '$0';
+  if (netoEl) { netoEl.textContent = '$0'; netoEl.classList.remove('negative'); }
+  if (mrgEl) mrgEl.textContent = 'Margen —';
 
-  const cierresInfo = document.getElementById('mes-cierres-info');
-  if (cierresInfo) cierresInfo.textContent = 'Días cerrados: 0 · Pendientes: 0';
+  const chipCerrados = document.getElementById('mes-chip-cerrados');
+  const chipPendientes = document.getElementById('mes-chip-pendientes');
+  if (chipCerrados) chipCerrados.textContent = '0 cerrados';
+  if (chipPendientes) chipPendientes.textContent = '0 pendientes';
 
   const diasBody = document.getElementById('dias-mes-body');
   if (diasBody) diasBody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">Aún no hay datos este mes</div><div class="empty-state-desc">Los días se irán llenando al cerrar la caja</div></div></td></tr>';
@@ -677,10 +757,6 @@ function setMesEmptyState() {
   const blockSemana = document.querySelector('.mes-card-block--semana');
   if (blockProg) blockProg.style.display = 'none';
   if (blockSemana) blockSemana.style.display = 'none';
-  const cardResumenHabitos = document.querySelector('.mes-resumen-habitos-card');
-  if (cardResumenHabitos) cardResumenHabitos.style.display = 'none';
-  const salud = document.getElementById('mes-salud');
-  if (salud) salud.classList.add('hidden');
   const masivoEl = document.getElementById('mes-cierre-masivo');
   if (masivoEl) masivoEl.style.display = 'none';
   const navHoy = document.getElementById('mes-nav-hoy');
@@ -692,9 +768,14 @@ function setMesEmptyState() {
 
 function renderMesTitulo() {
   const { y, m } = state.curMes;
-  document.getElementById('mes-titulo').textContent =
-    MESES_ES[m - 1].charAt(0).toUpperCase() + MESES_ES[m - 1].slice(1) + ' ' + y;
+  const mesNombre = MESES_ES[m - 1].charAt(0).toUpperCase() + MESES_ES[m - 1].slice(1);
+  const tituloEl = document.getElementById('mes-titulo');
+  const annoEl = document.getElementById('mes-anno');
+  if (tituloEl) tituloEl.textContent = mesNombre;
+  if (annoEl) annoEl.textContent = String(y);
   const hoy = todayObj();
+  const pip = document.getElementById('mes-today-pip');
+  if (pip) pip.style.display = (y === hoy.y && m === hoy.m) ? 'inline-block' : 'none';
   const navHoy = document.getElementById('mes-nav-hoy');
   if (navHoy) navHoy.style.display = (y !== hoy.y || m !== hoy.m) ? 'block' : 'none';
 }
@@ -702,18 +783,32 @@ function renderMesTitulo() {
 function renderMesKPIs(dayData, days, totIng, totGs, totNeto, mrg, numGs, mejor) {
   const diasCerrados = dayData.filter(d => d.cerrado).length;
   const diasPend     = days.length - diasCerrados;
+  const chipCerrados = document.getElementById('mes-chip-cerrados');
+  const chipPendientes = document.getElementById('mes-chip-pendientes');
+  if (chipCerrados) chipCerrados.textContent = diasCerrados + (diasCerrados === 1 ? ' cerrado' : ' cerrados');
+  if (chipPendientes) chipPendientes.textContent = diasPend + (diasPend === 1 ? ' pendiente' : ' pendientes');
   document.getElementById('mk-ing').textContent      = fmt(totIng);
   document.getElementById('mk-gas').textContent      = fmt(totGs);
-  document.getElementById('mk-neto').textContent     = fmt(totNeto);
   document.getElementById('mk-ing-sub').textContent  = days.length + ' días con datos';
   document.getElementById('mk-gas-sub').textContent  = numGs + ' registros';
-  document.getElementById('mk-neto-sub').textContent = 'Margen ' + mrg + '%';
   const jsM = new Date(mejor.o.y, mejor.o.m-1, mejor.o.d);
   document.getElementById('mk-mejor-val').textContent = fmt(mejor.ing);
   document.getElementById('mk-mejor-dia').textContent = `${DIAS_ES[jsM.getDay()]} ${mejor.o.d}`;
 
-  const cierresInfo = document.getElementById('mes-cierres-info');
-  if (cierresInfo) cierresInfo.textContent = `Días cerrados: ${diasCerrados} · Pendientes: ${diasPend}`;
+  const heroNeto = document.getElementById('mk-hero-neto');
+  if (heroNeto) {
+    heroNeto.textContent = fmt(totNeto);
+    heroNeto.classList.remove('positive', 'negative', 'zero');
+    if (totIng === 0 && totGs === 0) heroNeto.classList.add('zero');
+    else if (totNeto >= 0) heroNeto.classList.add('positive');
+    else heroNeto.classList.add('negative');
+  }
+  const heroDesc = document.getElementById('mk-hero-desc');
+  if (heroDesc) {
+    heroDesc.textContent = totIng > 0
+      ? 'Ingresos del mes menos gastos del mes · Margen ' + mrg + '%'
+      : 'Ingresos del mes menos gastos del mes';
+  }
 }
 
 /**
@@ -727,16 +822,25 @@ function renderMesCorte(y, m, corte, totalsCorte) {
   const { totIng: cIng, totGs: cGs, totNeto: cNeto, mrg: cMrg } = totalsCorte;
 
   const corteInput = document.getElementById('mes-corte-dia');
-  const corteLabel = document.getElementById('mes-corte-resumen');
+  const corteHint = document.getElementById('mes-corte-resumen');
   if (corteInput) corteInput.value = corte;
-  if (corteLabel) {
-    corteLabel.textContent =
-      'Hasta el ' + corte +
-      ': Ing ' + fmt(cIng) +
-      ' · Gs ' + fmt(cGs) +
-      ' · Neto ' + fmt(cNeto) +
-      ' (' + cMrg + '%)';
+  if (corteHint) corteHint.textContent = 'Totales acumulados del día 1 al ' + corte + ' del mes.';
+
+  const wrap = document.getElementById('mes-totales-result-wrap');
+  const diaEl = document.getElementById('mes-totales-dia');
+  const ingEl = document.getElementById('mes-totales-ing');
+  const gsEl = document.getElementById('mes-totales-gs');
+  const netoEl = document.getElementById('mes-totales-neto');
+  const mrgEl = document.getElementById('mes-totales-mrg');
+  if (diaEl) diaEl.textContent = corte;
+  if (ingEl) ingEl.textContent = fmt(cIng);
+  if (gsEl) gsEl.textContent = fmt(cGs);
+  if (netoEl) {
+    netoEl.textContent = fmt(cNeto);
+    netoEl.classList.toggle('negative', cNeto < 0);
   }
+  if (mrgEl) mrgEl.textContent = 'Margen ' + cMrg + '%';
+  if (wrap) wrap.classList.add('show');
 }
 
 function renderMesProgresoDia(diaActual, diasEnMes, netoAcumulado) {
@@ -770,109 +874,8 @@ function renderMesEstaSemana(y, m, hoy) {
     acGs += (d.gastos || []).reduce(function (s, g) { return s + g.monto; }, 0);
     it.setDate(it.getDate() + 1);
   }
-  wrap.innerHTML = '<div class="mes-esta-semana-title">📅 Esta semana (lun–hoy)</div>' +
-    '<div class="mes-esta-semana-row">Ingresos ' + fmt(acIng) + ' · Gastos ' + fmt(acGs) + ' · Neto ' + fmt(acIng - acGs) + '</div>';
+  wrap.innerHTML = '<div class="mes-esta-semana-row">Ingresos ' + fmt(acIng) + ' · Gastos ' + fmt(acGs) + ' · Neto ' + fmt(acIng - acGs) + '</div>';
   wrap.classList.remove('hidden');
-}
-
-function renderMesSalud(dayData, mrg, semanas, y, m, hoy) {
-  const wrap = document.getElementById('mes-salud');
-  if (!wrap) return;
-  const keys = allDayKeys();
-  const hoyKey = dateKey(hoy);
-  const idx = keys.indexOf(hoyKey);
-  const rachaArr = [];
-  for (let i = idx - 1; i >= 0 && rachaArr.length < 31; i--) {
-    const p = keys[i].split('-');
-    const o = { y: parseInt(p[0], 10), m: parseInt(p[1], 10), d: parseInt(p[2], 10) };
-    const d = loadDay(o);
-    rachaArr.push({ cerrado: !!d.cerrado });
-  }
-  const racha = getRachaCierres(rachaArr);
-  const diasVerdes = getDiasVerdes(dayData);
-  let ingEsta = 0, ingAnterior = 0;
-  if (semanas && semanas.length >= 2 && hoy.y === y && hoy.m === m) {
-    const jsHoy = new Date(hoy.y, hoy.m - 1, hoy.d);
-    const dow = jsHoy.getDay();
-    const diffLun = dow === 0 ? 6 : dow - 1;
-    const lun = new Date(jsHoy);
-    lun.setDate(jsHoy.getDate() - diffLun);
-    const lastSun = new Date(lun);
-    lastSun.setDate(lun.getDate() - 1);
-    const lastLun = new Date(lastSun);
-    lastLun.setDate(lastSun.getDate() - 6);
-    for (const d = new Date(lun); d <= jsHoy; d.setDate(d.getDate() + 1)) {
-      const o = { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
-      const ld = loadDay(o);
-      ingEsta += (ld.ef || 0) + (ld.tb || 0);
-    }
-    for (const d = new Date(lastLun); d <= lastSun; d.setDate(d.getDate() + 1)) {
-      const o = { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
-      const ld = loadDay(o);
-      ingAnterior += (ld.ef || 0) + (ld.tb || 0);
-    }
-  }
-  const tendenciaPct = getTendenciaSemanalPct(ingEsta, ingAnterior);
-  const rachaTxt = racha > 0 ? 'Llevas ' + racha + ' día' + (racha === 1 ? '' : 's') + ' cerrando la caja ✓' : '—';
-  const diasVerdesTxt = diasVerdes.total > 0 ? diasVerdes.verdes + ' de ' + diasVerdes.total + ' días con ganancia' : '—';
-  wrap.innerHTML =
-    '<div class="mes-salud-row"><span>Cierres seguidos</span><span>' + rachaTxt + '</span></div>' +
-    '<div class="mes-salud-row"><span>Días con ganancia</span><span>' + diasVerdesTxt + '</span></div>';
-  wrap.classList.remove('hidden');
-}
-
-function renderMesResumenNegocio(y, m, days, dayData, totIng, maxDiaDatos) {
-  const resumenNegEl = document.getElementById('mes-resumen-negocio');
-  if (!resumenNegEl) return;
-  const diasEnMes = new Date(y, m, 0).getDate();
-  const promIngresoDia = Math.round(totIng / days.length);
-  const proyeccion = promIngresoDia * diasEnMes;
-  const ritmoReciente = getPromedioMovil7(dayData.map(function (item) { return item.ing; }));
-  const proyeccionRitmo = Math.round(ritmoReciente * diasEnMes);
-  const prevM = m === 1 ? 12 : m - 1;
-  const prevY = m === 1 ? y - 1 : y;
-  const daysPrev = getDaysOfMonth(prevY, prevM);
-  const hastaDia = Math.min(maxDiaDatos, new Date(prevY, prevM, 0).getDate());
-  const ingEstePeriodo = dayData.filter(item => item.o.d <= hastaDia).reduce((s, item) => s + item.ing, 0);
-  const daysPrevMismoPeriodo = daysPrev.filter(o => o.d <= hastaDia);
-  let vsAnterior = '';
-  let vsAnteriorCorto = '';
-  if (daysPrevMismoPeriodo.length > 0) {
-    let ingPrev = 0;
-    daysPrevMismoPeriodo.forEach(o => { const d = loadDay(o); ingPrev += (d.ef || 0) + (d.tb || 0); });
-    const pct = ingPrev > 0 ? Math.round(((ingEstePeriodo - ingPrev) / ingPrev) * 100) : 0;
-    vsAnterior = pct >= 0
-      ? 'Vendes <span class="mes-vs-pos">' + pct + '% más</span> que en el mismo período del mes pasado'
-      : 'Vendes <span class="mes-vs-neg">' + pct + '% menos</span> que en el mismo período del mes pasado';
-    const signo = pct >= 0 ? '+' : '';
-    vsAnteriorCorto = signo + pct + '% vs mes pasado';
-  } else {
-    vsAnterior = 'No hay datos del mes pasado para comparar';
-    vsAnteriorCorto = 'Sin comparación mes pasado';
-  }
-  let objMeta = {};
-  try {
-    const metaRaw = localStorage.getItem(PREFIX + 'meta');
-    if (metaRaw) objMeta = JSON.parse(metaRaw);
-  } catch (e) {}
-  const objetivoMensual = objMeta.objetivoMensual;
-  let objetivoLabel = '';
-  if (typeof objetivoMensual === 'number' && objetivoMensual > 0) {
-    const pctObj = Math.round((ingEstePeriodo / objetivoMensual) * 100);
-    objetivoLabel = 'Meta ' + pctObj + '%';
-  }
-  const mrgNum = parseFloat(totIng > 0 ? ((dayData.reduce(function (s, it) { return s + it.neto; }, 0) / totIng) * 100).toFixed(1) : 0);
-  const lineaMargenBajo = (mrgNum < 10 && dayData.length >= 3) ? '<div class="mes-rn-row mes-margen-bajo">⚠️ Este mes queda poco margen; conviene revisar los gastos.</div>' : '';
-  var proyeccionMostrar = ritmoReciente > 0 ? proyeccionRitmo : proyeccion;
-  resumenNegEl.innerHTML =
-    '<div class="mes-rn-row mes-rn-compact">' +
-      '<span>Prom/día ' + fmt(promIngresoDia) + '</span>' +
-      '<span>Proy. fin ' + fmt(proyeccionMostrar) + '</span>' +
-      (objetivoLabel ? '<span>' + objetivoLabel + '</span>' : '') +
-      '<span>' + vsAnteriorCorto + '</span>' +
-    '</div>' +
-    lineaMargenBajo;
-  resumenNegEl.classList.add('show');
 }
 
 function renderMesNotas(dayData) {
@@ -895,29 +898,9 @@ function renderMesNotas(dayData) {
 }
 
 function renderMesAvanzado(dayData, totEf, totTb, totIng, semanas, days, y, m) {
-  const efPct = totIng > 0 ? (totEf/totIng*100).toFixed(0) : 50;
-  const tbPct = totIng > 0 ? (totTb/totIng*100).toFixed(0) : 50;
-  document.getElementById('comp-ef-bar').style.width = efPct + '%';
-  document.getElementById('comp-tb-bar').style.width = tbPct + '%';
-  document.getElementById('comp-ef-pct').textContent = efPct + '%';
-  document.getElementById('comp-tb-pct').textContent = tbPct + '%';
-  document.getElementById('comp-ef-monto').textContent = fmt(totEf);
-  document.getElementById('comp-tb-monto').textContent = fmt(totTb);
-
-  const maxSemIng = Math.max(...semanas.map(s=>s.ing), 1);
-  const chart = document.getElementById('bar-chart');
-  chart.innerHTML = semanas.map((s,i) => {
-    const pct = (s.ing / maxSemIng * 100).toFixed(0);
-    return `<div class="bar-col">
-      <div class="bar-val">${fmt(s.ing)}</div>
-      <div class="bar-outer" style="height:80px">
-        <div class="bar-inner" style="height:${pct}%"></div>
-      </div>
-      <div class="bar-lbl">S${i+1}</div>
-    </div>`;
-  }).join('');
-
   const tbody = document.getElementById('semanas-body');
+  const topDiasEl = document.getElementById('top-dias');
+  if (!tbody) return;
   const maxNeto = Math.max(...semanas.map(s=>s.neto));
   tbody.innerHTML = semanas.map((s,i) => {
     const netoClass = s.neto >= 0 ? 'td-neto-pos' : 'td-neto-neg';
@@ -933,7 +916,7 @@ function renderMesAvanzado(dayData, totEf, totTb, totIng, semanas, days, y, m) {
 
   const top3 = [...dayData].sort((a,b)=>b.ing-a.ing).slice(0,3);
   const ranks = ['rank-1','rank-2','rank-3'];
-  document.getElementById('top-dias').innerHTML = top3.length === 0
+  if (topDiasEl) topDiasEl.innerHTML = top3.length === 0
     ? '<div class="empty-note">Sin datos</div>'
     : top3.map((item,i) => {
         const jsD = new Date(item.o.y, item.o.m-1, item.o.d);
@@ -1051,18 +1034,6 @@ function renderMes() {
 
   const semanas = agruparSemanas(days, y, m);
   renderMesAvanzado(dayData, totEf, totTb, totIng, semanas, days, y, m);
-  renderMesSalud(dayData, mrg, semanas, y, m, hoy);
-  const resumenEl = document.getElementById('mes-resumen-negocio');
-  const saludEl = document.getElementById('mes-salud');
-  const blockResumen = document.querySelector('.mes-card-block--resumen');
-  const blockHabitos = document.querySelector('.mes-card-block--habitos');
-  const cardResumenHabitos = document.querySelector('.mes-resumen-habitos-card');
-  if (blockResumen) blockResumen.style.display = (resumenEl && resumenEl.classList.contains('show')) ? '' : 'none';
-  if (blockHabitos) blockHabitos.style.display = (saludEl && !saludEl.classList.contains('hidden')) ? '' : 'none';
-  if (cardResumenHabitos) {
-    const algunoVisible = (resumenEl && resumenEl.classList.contains('show')) || (saludEl && !saludEl.classList.contains('hidden'));
-    cardResumenHabitos.style.display = algunoVisible ? '' : 'none';
-  }
 }
 
 function irADiaDesdeMes(y, m, d) {
@@ -1110,14 +1081,20 @@ function buildMesesMap(keys) {
   return mesesMap;
 }
 
-/** Rellena hero (total neto, mejor/peor mes) y subtítulo. */
-function renderHistoricoHero(totalNetoEl, mejorMesEl, peorMesEl, heroSubEl, comparativaEl, totalNeto, mejor, peor, meses, mesLabel) {
+/** Rellena hero (total neto, mejor/peor mes) y subtítulo. selectedYear opcional para filtro por año. */
+function renderHistoricoHero(totalNetoEl, mejorMesEl, peorMesEl, heroSubEl, comparativaEl, totalNeto, mejor, peor, meses, mesLabel, selectedYear) {
   totalNetoEl.textContent = fmt(totalNeto);
   totalNetoEl.classList.toggle('negative', totalNeto < 0);
   mejorMesEl.textContent = mejor ? mesLabel(mejor) + ' · ' + fmt(mejor.neto) : '—';
   peorMesEl.textContent = peor ? mesLabel(peor) + ' · ' + fmt(peor.neto) : '—';
   peorMesEl.classList.toggle('negative', peor && peor.neto < 0);
-  if (heroSubEl) heroSubEl.textContent = meses.length + ' mes' + (meses.length === 1 ? '' : 'es') + ' registrado' + (meses.length === 1 ? '' : 's');
+  if (heroSubEl) {
+    if (selectedYear != null) {
+      heroSubEl.textContent = meses.length + ' mes' + (meses.length === 1 ? '' : 'es') + ' en ' + selectedYear;
+    } else {
+      heroSubEl.textContent = meses.length + ' mes' + (meses.length === 1 ? '' : 'es') + ' registrado' + (meses.length === 1 ? '' : 's');
+    }
+  }
   if (comparativaEl) comparativaEl.style.display = (mejor || peor) ? '' : 'none';
 }
 
@@ -1162,7 +1139,7 @@ function renderHistorico() {
   if (!tbody || !totalNetoEl || !mejorMesEl || !peorMesEl || !yearFilterEl) return;
 
   const keys = allDayKeys();
-  const emptyRow = '<tr><td colspan="5" class="hist-empty">Aún no hay datos históricos. A medida que cierres la caja se irán mostrando aquí los meses.</td></tr>';
+  const emptyRow = '<tr><td colspan="5" class="hist-empty">Aún no hay datos. Cierra días en Caja para que aparezcan aquí los meses.</td></tr>';
   if (keys.length === 0) {
     tbody.innerHTML = emptyRow;
     totalNetoEl.textContent = fmt(0);
@@ -1207,33 +1184,46 @@ function renderHistorico() {
     visibleMeses = meses.filter(function (mesItem) { return mesItem.y === selectedYear; });
   }
 
-  const totalNeto = meses.reduce(function (s, mesItem) { return s + mesItem.neto; }, 0);
+  // Cuando hay filtro de año, hero y mejor/peor usan solo los meses visibles
+  const mesesParaHero = visibleMeses.length > 0 ? visibleMeses : meses;
+  const totalNeto = mesesParaHero.reduce(function (s, mesItem) { return s + mesItem.neto; }, 0);
   let mejor = null;
   let peor = null;
-  meses.forEach(function (mesItem) {
+  mesesParaHero.forEach(function (mesItem) {
     if (!mejor || mesItem.neto > mejor.neto) mejor = mesItem;
     if (!peor || mesItem.neto < peor.neto) peor = mesItem;
   });
 
-  renderHistoricoHero(totalNetoEl, mejorMesEl, peorMesEl, heroSubEl, comparativaEl, totalNeto, mejor, peor, meses, mesLabel);
+  renderHistoricoHero(totalNetoEl, mejorMesEl, peorMesEl, heroSubEl, comparativaEl, totalNeto, mejor, peor, mesesParaHero, mesLabel, selectedYear);
   const barMejor = document.getElementById('hist-bar-mejor');
   const barPeor = document.getElementById('hist-bar-peor');
   renderHistoricoBarras(barMejor, barPeor, mejor, peor);
 
   if (visibleMeses.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" class="hist-empty">No hay meses para este filtro.</td></tr>';
+    updateHistoricoSortHeaders();
     return;
   }
 
+  var sortBy = state.historicoSort.by;
+  var sortDir = state.historicoSort.dir;
   visibleMeses.sort(function (a, b) {
-    if (a.y === b.y) return b.m - a.m;
-    return b.y - a.y;
+    var va, vb;
+    if (sortBy === 'fecha') {
+      if (a.y !== b.y) return sortDir * (a.y - b.y);
+      return sortDir * (a.m - b.m);
+    }
+    if (sortBy === 'ingresos') { va = a.totIng; vb = b.totIng; }
+    else if (sortBy === 'gastos') { va = a.totGs; vb = b.totGs; }
+    else { va = a.neto; vb = b.neto; }
+    if (va === vb) return 0;
+    return sortDir * (va > vb ? 1 : -1);
   });
 
   const hoy = todayObj();
-  const promedioNeto = meses.length > 0 ? meses.reduce(function (s, mesItem) { return s + mesItem.neto; }, 0) / meses.length : 0;
+  const promedioNeto = visibleMeses.length > 0 ? visibleMeses.reduce(function (s, mesItem) { return s + mesItem.neto; }, 0) / visibleMeses.length : 0;
 
-  tbody.innerHTML = visibleMeses.map(function (mesItem) {
+  const rowsHtml = visibleMeses.map(function (mesItem) {
     const label = mesLabel(mesItem);
     const estadoTxt = mesItem.numDias === 0
       ? 'Sin datos'
@@ -1258,7 +1248,50 @@ function renderHistorico() {
       '<td class="' + netoClass + '">' + fmt(mesItem.neto) + '</td>' +
       '<td class="' + estadoClass + '">' + estadoTxt + '</td>' +
       '</tr>';
-  }).join('');
+  });
+
+  // Fila de totales cuando hay más de un mes visible
+  let totalsRow = '';
+  if (visibleMeses.length > 1) {
+    const sumIng = visibleMeses.reduce(function (s, mesItem) { return s + mesItem.totIng; }, 0);
+    const sumGs = visibleMeses.reduce(function (s, mesItem) { return s + mesItem.totGs; }, 0);
+    const sumNeto = sumIng - sumGs;
+    const netoClassTot = sumNeto >= 0 ? 'td-neto-pos' : 'td-neto-neg';
+    totalsRow = '<tr class="hist-totals-row" aria-label="Totales">' +
+      '<td><strong>' + (selectedYear ? 'Total ' + selectedYear : 'Total') + '</strong></td>' +
+      '<td><strong>' + fmt(sumIng) + '</strong></td>' +
+      '<td><strong>' + fmt(sumGs) + '</strong></td>' +
+      '<td class="' + netoClassTot + '"><strong>' + fmt(sumNeto) + '</strong></td>' +
+      '<td></td></tr>';
+  }
+  tbody.innerHTML = rowsHtml.join('') + totalsRow;
+  updateHistoricoSortHeaders();
+}
+
+function sortHistoricoBy(col) {
+  if (state.historicoSort.by === col) {
+    state.historicoSort.dir *= -1;
+  } else {
+    state.historicoSort.by = col;
+    state.historicoSort.dir = (col === 'fecha' ? -1 : 1);
+  }
+  renderHistorico();
+}
+
+function updateHistoricoSortHeaders() {
+  var by = state.historicoSort.by;
+  var dir = state.historicoSort.dir;
+  var arrow = dir === 1 ? ' ↑' : ' ↓';
+  var labels = { fecha: 'Mes', ingresos: 'Ingresos', gastos: 'Gastos', neto: 'Neto' };
+  var ids = ['hist-th-mes', 'hist-th-ingresos', 'hist-th-gastos', 'hist-th-neto'];
+  var cols = ['fecha', 'ingresos', 'gastos', 'neto'];
+  cols.forEach(function (col, i) {
+    var th = document.getElementById(ids[i]);
+    if (!th) return;
+    th.textContent = labels[col] + (by === col ? arrow : '');
+    th.setAttribute('aria-sort', by === col ? (dir === 1 ? 'ascending' : 'descending') : 'none');
+    th.classList.toggle('hist-th-sorted', by === col);
+  });
 }
 
 function irAMesDesdeHistorico(y, m) {
@@ -1347,13 +1380,13 @@ function actualizarCajaWizardUI() {
   if (state.cajaPaso === 1) {
     txt = 'Paso 1 de 4 · Efectivo en caja';
     helpTxt = 'Escribe el total y pulsa Guardar.';
-    if (paso1Guardado) check = ' ✓';
+    if (state.paso1Guardado) check = ' ✓';
     if (next) next.textContent = 'Ir a Transbank ›';
   }
   if (state.cajaPaso === 2) {
     txt = 'Paso 2 de 4 · Transbank (tarjeta)';
     helpTxt = 'Escribe el total del cierre y pulsa Guardar.';
-    if (paso2Guardado) check = ' ✓';
+    if (state.paso2Guardado) check = ' ✓';
     if (next) next.textContent = 'Ir a gastos ›';
   }
   if (state.cajaPaso === 3) {
@@ -1374,7 +1407,7 @@ function actualizarCajaWizardUI() {
   for (let i = 1; i <= 4; i++) {
     const chip = document.getElementById('cw-chip-' + i);
     if (chip) {
-      chip.setAttribute('aria-selected', i === cajaPaso ? 'true' : 'false');
+      chip.setAttribute('aria-selected', i === state.cajaPaso ? 'true' : 'false');
       chip.classList.toggle('active', i === state.cajaPaso);
     }
   }
@@ -1429,9 +1462,18 @@ function confirmarCierreDia() {
   if (!state.S) return;
   const { totG, totI } = calcularResumenDia(state.S);
   if (totI === 0 && totG === 0) {
-    if (!confirm('¿No abriste este día? Se marcará como cerrado con $0 en ventas y sin gastos.')) {
-      return;
-    }
+    abrirModalSinVentas(function ejecutarCierreDesdePaso4() {
+      state.S.cerrado = true;
+      state.S.cerradoHora = hora();
+      if (!saveDay(state.cur, state.S)) return;
+      showGuardadoIndicator();
+      renderCaja();
+      cerrarModalCierre();
+      const jsD = new Date(state.cur.y, state.cur.m - 1, state.cur.d);
+      const label = `${DIAS_ES[jsD.getDay()]} ${state.cur.d}`;
+      toast(label + ' cerrado ✓', 'success');
+    });
+    return;
   }
   state.S.cerrado = true;
   state.S.cerradoHora = hora();
@@ -1451,18 +1493,19 @@ function cerrarDiaSinVentas() {
     toast('Hay datos ingresados. Usa "Confirmar cierre del día" en el paso 4.');
     return;
   }
-  if (!confirm('¿Cerrar este día como "no abrí"? Se guardará con $0 en ventas y sin gastos.')) return;
-  state.S.ef = 0;
-  state.S.tb = 0;
-  state.S.gastos = [];
-  state.S.nota = state.S.nota || '';
-  state.S.cerrado = true;
-  state.S.cerradoHora = hora();
-  if (!saveDay(state.cur, state.S)) return;
-  showGuardadoIndicator();
-  renderCaja();
-  const jsD = new Date(state.cur.y, state.cur.m - 1, state.cur.d);
-  toast(jsD.getDate() + ' cerrado (sin ventas) ✓', 'success');
+  abrirModalSinVentas(function ejecutarCierreSinVentas() {
+    state.S.ef = 0;
+    state.S.tb = 0;
+    state.S.gastos = [];
+    state.S.nota = state.S.nota || '';
+    state.S.cerrado = true;
+    state.S.cerradoHora = hora();
+    if (!saveDay(state.cur, state.S)) return;
+    showGuardadoIndicator();
+    renderCaja();
+    const jsD = new Date(state.cur.y, state.cur.m - 1, state.cur.d);
+    toast(jsD.getDate() + ' cerrado (sin ventas) ✓', 'success');
+  });
 }
 
 function getPendientesHastaHoyEnRangoDias(maxDiasAtras) {
@@ -1496,7 +1539,7 @@ function renderPendientes() {
     return;
   }
   const diasTxt = lista.map(o => o.d).join(', ');
-  banner.innerHTML = '<strong>Tienes días sin cerrar en los últimos 30 días:</strong> ' + escapeHtml(diasTxt) + '. <button class="btn btn-sm btn-ghost" onclick="irAPrimerPendiente()">Ir al primero</button>';
+  banner.innerHTML = '<span class="caja-notif-msg"><strong>Tienes días sin cerrar en los últimos 30 días:</strong> ' + escapeHtml(diasTxt) + '.</span> <button type="button" class="btn btn-sm btn-ghost caja-notif-action" onclick="irAPrimerPendiente(); cerrarNotifPanel();">Ir al primero</button>';
   banner.classList.add('show');
 }
 
@@ -1512,16 +1555,7 @@ function irAPrimerPendiente() {
   if (notaIn) notaIn.value = state.S.nota || '';
   state.cajaPaso = 1;
   updateDateHeader();
-  renderCaja();
   setTab('caja');
-}
-
-function toggleMesAdvanced() {
-  const sec = document.getElementById('mes-advanced');
-  const btn = document.getElementById('btn-mes-adv');
-  if (!sec || !btn) return;
-  const hidden = sec.classList.toggle('hidden');
-  btn.textContent = hidden ? 'Ver análisis avanzado' : 'Ocultar análisis avanzado';
 }
 
 function agruparSemanas(days, y, m) {
@@ -1789,6 +1823,26 @@ function cerrarModal() {
   const ov = document.getElementById('overlay');
   ov.classList.remove('open');
 }
+
+/** Modal "¿No abriste este día?" — evita confirm() del navegador */
+var pendingCierreSinVentasCallback = null;
+function abrirModalSinVentas(onConfirm) {
+  pendingCierreSinVentasCallback = onConfirm;
+  const ov = document.getElementById('overlay-sin-ventas');
+  if (ov) ov.classList.add('open');
+  const btn = document.getElementById('modal-btn-sin-ventas');
+  if (btn) btn.focus();
+}
+function cerrarModalSinVentas() {
+  pendingCierreSinVentasCallback = null;
+  const ov = document.getElementById('overlay-sin-ventas');
+  if (ov) ov.classList.remove('open');
+}
+function confirmarCierreSinVentasModal() {
+  if (typeof pendingCierreSinVentasCallback === 'function') pendingCierreSinVentasCallback();
+  cerrarModalSinVentas();
+}
+
 function limpiar() {
   state.S = {ef:0, tb:0, gastos:[], nota:''};
   document.getElementById('nota-in').value = '';
@@ -1809,6 +1863,10 @@ function abrirModalCierre() {
   document.getElementById('modal-ef-in').value = (state.S.ef > 0 ? String(state.S.ef) : '');
   document.getElementById('modal-tb-in').value = (state.S.tb > 0 ? String(state.S.tb) : '');
   document.getElementById('modal-nota-in').value = state.S.nota || '';
+  var tipoEl = document.getElementById('modal-gs-tipo');
+  var otrosEl = document.getElementById('modal-gs-desc-otros');
+  if (tipoEl) tipoEl.value = '';
+  if (otrosEl) { otrosEl.value = ''; otrosEl.style.display = 'none'; }
   renderModalGastosList();
   ov.classList.add('open');
   setTimeout(function () {
@@ -1846,19 +1904,40 @@ function renderModalGastosList() {
   }
 }
 
+function toggleModalGsOtros() {
+  const tipoEl = document.getElementById('modal-gs-tipo');
+  const otrosEl = document.getElementById('modal-gs-desc-otros');
+  if (!tipoEl || !otrosEl) return;
+  const isOtros = tipoEl.value === 'otros';
+  otrosEl.style.display = isOtros ? 'block' : 'none';
+  otrosEl.placeholder = 'Escribe la descripción';
+  if (!isOtros) otrosEl.value = '';
+  if (isOtros) otrosEl.focus();
+}
+
 function addGastoEnModal() {
-  const descEl = document.getElementById('modal-gs-desc');
+  const tipoEl = document.getElementById('modal-gs-tipo');
+  const otrosEl = document.getElementById('modal-gs-desc-otros');
   const montoEl = document.getElementById('modal-gs-monto');
-  const d = (descEl && descEl.value) ? descEl.value.trim() : '';
+  var d = '';
+  if (tipoEl && tipoEl.value) {
+    if (tipoEl.value === 'otros') {
+      d = (otrosEl && otrosEl.value) ? otrosEl.value.trim() : '';
+      if (!d) { toast('Escribe la descripción en Otros 📝'); return; }
+    } else {
+      d = tipoEl.value;
+    }
+  }
   const m = parseInt((montoEl && montoEl.value) ? String(montoEl.value).replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '') : '', 10);
-  if (!d) { toast('Escribe una descripción 📝'); return; }
+  if (!d) { toast('Elige un tipo de gasto 📝'); return; }
   if (!m || m <= 0) { toast('Monto inválido 💰'); return; }
   if (!state.S.gastos) state.S.gastos = [];
   state.S.gastos.push({ id: Date.now(), desc: d, monto: m, hora: hora() });
   state.S.cerrado = false;
-  if (descEl) descEl.value = '';
+  if (tipoEl) tipoEl.value = '';
+  if (otrosEl) { otrosEl.value = ''; otrosEl.style.display = 'none'; }
   if (montoEl) montoEl.value = '';
-  if (descEl) descEl.focus();
+  if (tipoEl) tipoEl.focus();
   renderModalGastosList();
   toast('Gasto agregado ✓', 'success');
 }
@@ -1961,10 +2040,16 @@ function toast(msg, type) {
 document.addEventListener('keydown', e => {
   const overlay = document.getElementById('overlay');
   const overlayCierre = document.getElementById('overlay-cierre');
+  const overlaySinVentas = document.getElementById('overlay-sin-ventas');
+  const notifPanel = document.getElementById('notif-panel');
   const modalOpen = overlay && overlay.classList.contains('open');
   const cierreOpen = overlayCierre && overlayCierre.classList.contains('open');
+  const sinVentasOpen = overlaySinVentas && overlaySinVentas.classList.contains('open');
+  const notifOpen = notifPanel && notifPanel.classList.contains('open');
 
   if (cierreOpen && e.key === 'Escape') { cerrarModalCierre(); return; }
+  if (sinVentasOpen && e.key === 'Escape') { cerrarModalSinVentas(); return; }
+  if (notifOpen && e.key === 'Escape') { cerrarNotifPanel(); return; }
   if (cierreOpen && e.key === 'Tab') {
     const modal = overlayCierre.querySelector('.modal-cierre');
     const focusable = modal ? modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') : [];
@@ -2002,7 +2087,7 @@ document.addEventListener('keydown', e => {
     if (cierreOpen && id === 'modal-gs-monto') { addGastoEnModal(); e.preventDefault(); }
     if (cierreOpen && id === 'modal-gs-desc') { const mEl = document.getElementById('modal-gs-monto'); if (mEl) mEl.focus(); e.preventDefault(); }
   }
-  if (e.key==='Escape') cerrarModal();
+  if (e.key==='Escape') { if (sinVentasOpen) cerrarModalSinVentas(); else if (modalOpen) cerrarModal(); }
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     const active = document.activeElement;
     if (active && active.classList.contains('tab-btn')) {
@@ -2023,12 +2108,28 @@ document.addEventListener('keydown', e => {
 document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) cerrarModal();
 });
+const overlaySinVentasEl = document.getElementById('overlay-sin-ventas');
+if (overlaySinVentasEl) {
+  overlaySinVentasEl.addEventListener('click', function (e) {
+    if (e.target === overlaySinVentasEl) cerrarModalSinVentas();
+  });
+}
 const overlayCierreEl = document.getElementById('overlay-cierre');
 if (overlayCierreEl) {
   overlayCierreEl.addEventListener('click', function (e) {
     if (e.target === overlayCierreEl) cerrarModalCierre();
   });
 }
+
+/* Cerrar panel de notificaciones al hacer clic fuera */
+document.addEventListener('click', function (e) {
+  const panel = document.getElementById('notif-panel');
+  const btn = document.getElementById('header-notif-btn');
+  if (!panel || !panel.classList.contains('open')) return;
+  if (btn && btn.contains(e.target)) return;
+  if (panel.contains(e.target)) return;
+  cerrarNotifPanel();
+});
 
 /* ──────────────────────────────────────────────────
    INIT + PWA
@@ -2052,6 +2153,12 @@ if (overlayCierreEl) {
   if (notaIn) notaIn.addEventListener('input', actualizarCajaWizardUI);
   updateDateHeader();
   renderCaja();
+  const viewCaja = document.getElementById('view-caja');
+  if (viewCaja && viewCaja.classList.contains('active')) {
+    document.body.classList.add('tab-caja-active');
+  }
+  /* Asegurar que el badge de avisos se actualice tras el primer render (misma lógica que al cambiar de pestaña) */
+  setTimeout(updateNotifPanelUI, 0);
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () {});

@@ -8,11 +8,11 @@ Aplicación web sencilla (PWA) para llevar la **caja diaria** de una florería: 
 
 ## Estado del proyecto
 
-- **Funcional:** La app está operativa con todas las funciones descritas más abajo: **Caja** (wizard de cierre en pasos, KPIs, recordatorio nocturno, día sin ventas), **Mes** (resumen, día de corte, avance, esta semana, hábitos de caja, cierre masivo de pendientes), **Histórico** (total ganado, mejor/peor mes, tabla de meses por año) y **Respaldo** (desde el botón del header: backup/restore, recordatorio de último backup).
-- **Navegación:** Tres pestañas en la barra: **Caja**, **Mes**, **Histórico**. El **Respaldo** se abre desde el botón 💾 del header.
-- **Arquitectura actual:** Lógica de dominio y almacenamiento en módulos separados (`js/domain.js`, `js/storage.js`); `app.js` con estado global y UI; estilos en `styles.css`. Tests automatizados con `npm test` (Node) y tests manuales en navegador (`tests.js`).
-- **Mejoras ya aplicadas:** Normalización de datos al cargar (`normalizeDayData`), manejo de errores en `loadDay` (toast + `console.warn`), validación de backup antes de restaurar, PWA con Service Worker registrado y caché de todos los assets, recordatorio si no se cerró el día (después de las 20:00), cierre masivo de días pendientes del mes, vista Histórico con filtro por año.
-- **Auditoría y roadmap:** En [AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md) hay una auditoría técnica y de producto (marzo 2025) con recomendaciones (ya aplicadas en gran parte), bugs priorizados e ideas de evolución. Consulta ese documento para el detalle.
+- **Funcional:** La app está operativa con todas las funciones descritas más abajo: **Caja** (cierre del día vía modal único: efectivo, Transbank, gastos y nota; KPIs, panel de avisos, recordatorio nocturno, día sin ventas), **Mes** (resumen, totales acumulados hasta un día, avance, esta semana, notas del mes, días del mes, cierre masivo de pendientes), **Histórico** (total ganado, mejor/peor mes, tabla de meses con filtro por año) y **Respaldo** (desde el botón 💾 del header: descargar/restaurar, recordatorio de último backup).
+- **Navegación:** Tres pestañas: **Caja**, **Mes**, **Histórico**. **Respaldo** se abre desde el botón 💾 del header.
+- **Arquitectura:** Lógica de dominio en `js/domain.js`, almacenamiento en `js/storage.js`, estado global y UI en `app.js`, estilos en `styles.css`. Tests automatizados con `npm test` (Node) y tests manuales en navegador (`tests.js`).
+- **Diseño:** Paleta 2026 (variables CSS en `:root`), componentes reutilizables (cards, KPIs, chips de estado), accesibilidad (ARIA, foco visible, contraste WCAG AA).
+- **Documentación:** [AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md) — auditoría técnica y de producto con roadmap; [REDISENO_UX_2026.md](./REDISENO_UX_2026.md) y [PROPUESTA_CAJA_2026.md](./PROPUESTA_CAJA_2026.md) para evolución de UX.
 
 ---
 
@@ -33,25 +33,30 @@ Abre en el navegador: **http://localhost:8000/index.html**
 ### Caja del día (pestaña **Caja**)
 
 - **Navegación de día:** selector con día anterior/siguiente e “Ir a hoy”; chip de estado (Día cerrado / Día pendiente / Sin datos). Banner cuando estás viendo un día pasado.
-- **Recordatorio nocturno:** si son más de las 20:00 y hoy sigue pendiente, se muestra un aviso para ir a cerrar el día.
-- **Cierre en wizard (pasos):** Paso 1 → Efectivo y Transbank; Paso 2 → Gastos del día; Paso 3 → Nota del día (opcional); Paso 4 → Resultado del día y acciones. Opción **Cerrar día sin ventas** si no abriste.
-- **KPIs en vista:** resultado del día (hero), efectivo, Transbank, gastos; contexto (promedio diario del mes, sobre/bajo promedio).
-- **Acciones:** Ingresar cierre, Copiar resumen, WhatsApp, **Guardar y cerrar día**, Limpiar día.
+- **Panel de avisos (🔔):** campanita en el header con avisos: día pasado, “no abriste este día”, recordatorio de cierre, días pendientes en los últimos 30.
+- **Cierre del día:** el flujo principal es el botón flotante **Ingresar cierre** (FAB), que abre un **modal único** donde ingresas:
+  - Efectivo y Transbank (totales del día).
+  - Gastos del día (tipo: Flores, Verde, Día Kathy, Otros; monto y descripción).
+  - Nota del día (opcional).
+  Desde el modal puedes **Guardar sin cerrar** o **Guardar y cerrar día**. Si no abriste, existe la opción **Cerrar día sin ventas** desde el aviso correspondiente.
+- **Vista Resultado del día:** en la misma pestaña se muestra el resumen (efectivo, Transbank, ingresos, gastos, balance neto, margen) y acciones: Editar, Copiar, WhatsApp, Limpiar.
+- **KPIs:** hero con “Lo que te queda hoy” (o resultado del día), desglose efectivo/Transbank/gastos, y contexto vs promedio del mes.
+- **Recordatorio nocturno:** después de las 20:00, si hoy sigue pendiente, se muestra un aviso para ir a cerrar el día.
 
 ### Resumen mensual (pestaña **Mes**)
 
-- **Cabecera:** navegación de mes, “Ir a mes actual”, resumen de cierres y botón **Cerrar pendientes del mes** (solo días con datos).
-- **Resumen del mes:** Total Ingresos, Total Gastos, Lo que ganaste (neto), Mejor día.
-- **Totales hasta un día:** día de corte (1–31) opcional, avance del mes, “Esta semana”.
-- **Resumen y hábitos:** resumen para el negocio (promedio, proyección, comparativa) y hábitos de caja.
-- **Notas importantes del mes** y tabla **Días del mes** (click en un día para abrirlo en Caja).
+- **Cabecera:** navegación de mes (‹ ›), “Ir a mes actual”, chips de estado (cerrados/pendientes) y botón **Cerrar pendientes del mes** (solo días con datos).
+- **Resumen del mes:** Lo que ganaste este mes (hero), desglose Total ingresos, Total gastos, Mejor día (ingresos).
+- **Totales acumulados hasta una fecha:** selector de día (1–31), totales hasta ese día, avance del mes y bloque “Esta semana (lun–hoy)”.
+- **Notas importantes del mes** y tabla **Días del mes** (click en un día para abrirlo en la pestaña Caja).
+- **Análisis avanzado:** resumen semanal del mes y Top 3 mejores días por ingresos.
 
 ### Histórico (pestaña **Histórico**)
 
-- **Total ganado** en todos los meses registrados.
+- **Total ganado** en todos los meses registrados (o en el año filtrado).
 - **Mejor y peor mes** con barras comparativas.
-- **Filtro por año** (o “Todos”).
-- **Tabla de meses** con Ingresos, Gastos, Neto y estado; click en un mes para abrirlo en la pestaña Mes.
+- **Filtro por año** (select “Todos” o año concreto).
+- **Tabla de meses** con columnas ordenables (Mes, Ingresos, Gastos, Neto, Estado); click en una fila para abrir ese mes en la pestaña Mes.
 
 ### Respaldo (botón 💾 del **header**)
 
@@ -72,33 +77,35 @@ Abre en el navegador: **http://localhost:8000/index.html**
 - **Almacenamiento:** `localStorage`.
 - **PWA:** `manifest.json`, `sw.js` (caché versionada, network first).
 
-**Archivos:**
+**Archivos principales:**
 
-| Archivo          | Descripción                                  |
-|------------------|----------------------------------------------|
-| `index.html`     | Estructura y vistas                          |
-| `styles.css`     | Estilos y diseño responsivo (WCAG AA)        |
-| `js/domain.js`   | Lógica de dominio (fechas, resumen, backup)  |
-| `js/storage.js`  | Persistencia en `localStorage`                |
-| `app.js`         | Estado global, UI (caja, mes, backup)        |
-| `sw.js`          | Service worker (caché versionada)            |
-| `manifest.json`  | PWA (nombre, icono, theme-color)              |
-| `tests.js`       | Tests manuales en navegador (`runTests()`)    |
-| `run-tests.js`   | Runner de tests automatizados (Node)         |
-| `package.json`   | Script `npm test` para tests de dominio      |
+| Archivo          | Descripción                                                  |
+|------------------|--------------------------------------------------------------|
+| `index.html`     | Estructura, vistas (Caja, Mes, Histórico, Respaldo), modales |
+| `styles.css`     | Estilos, variables CSS (paleta 2026), diseño responsivo (WCAG AA) |
+| `js/domain.js`   | Lógica de dominio (fechas, resumen, validación backup, `parseMontoInput`, etc.) |
+| `js/storage.js`  | Persistencia: `loadDay`, `saveDay`, `allDayKeys`, `getDaysOfMonth` |
+| `app.js`         | Estado global (`state`), UI (render Caja/Mes/Histórico/Respaldo, modal de cierre) |
+| `sw.js`          | Service worker (caché versionada, network first)            |
+| `manifest.json`  | PWA (nombre, icono, theme-color)                             |
+| `tests.js`       | Tests manuales en navegador (`runTests()`)                   |
+| `run-tests.js`   | Runner de tests automatizados (Node)                         |
+| `package.json`   | Script `npm test` para tests de dominio                     |
 
-**Orden de carga de scripts (index.html):** `js/domain.js` → `js/storage.js` → `app.js` → `tests.js`. El dominio expone funciones puras (fechas, resumen, validación de backup, `parseMontoInput`, `clampCorteDia`, etc.). Storage: `loadDay`, `saveDay`, `allDayKeys`, `getDaysOfMonth`. La app mantiene el **estado global** en `state` (`app.js`): `cur`, `curMes`, `mesCorteDia`, `cajaPaso`, pasos del wizard, `lastSavedAt`, `S`. La UI (Caja, Mes, Histórico, Respaldo) lee y escribe en `state`; los `onclick` del HTML llaman a funciones globales.
+La carpeta `scripts/` puede contener utilidades auxiliares (por ejemplo, generación de backups de prueba).
+
+**Orden de carga de scripts (index.html):** `js/domain.js` → `js/storage.js` → `app.js` → `tests.js`. El estado global (`state` en `app.js`) incluye `cur` (día seleccionado), `curMes`, `mesCorteDia`, `cajaPaso`, `S` (datos del día actual), `lastSavedAt`, etc. La UI se actualiza mediante funciones `render*`; los eventos del HTML llaman a funciones globales (`abrirModalCierre`, `setTab`, `guardarCierreDesdeModal`, etc.).
 
 ---
 
 ## Cómo usar la app (flujo diario)
 
 1. **Al cierre del día** → pestaña **Caja**:
-   - Ingresa total **efectivo** y total **Transbank** del día.
-   - Registra cada **gasto** (plata que salió) y, si quieres, la **nota** del día.
-   - Revisa el **Resultado del día** y pulsa **Confirmar cierre del día**.
+   - Pulsa **Ingresar cierre** (botón flotante o el CTA en la vista).
+   - En el modal: ingresa total **efectivo** y **Transbank**, agrega cada **gasto** (tipo y monto) y, opcionalmente, la **nota** del día.
+   - Elige **Guardar sin cerrar** (para seguir editando) o **Guardar y cerrar día** para marcar el día como cerrado.
 
-2. **Histórico** → pestaña **Mes** → tabla “Días del mes” → toca un día para verlo/editarlo en Caja.
+2. **Ver o editar un día** → pestaña **Mes** → tabla “Días del mes” → toca un día para abrirlo en Caja (o desde Histórico, toca un mes y luego un día).
 
 3. **Respaldo** → Descargar backup con frecuencia; restaurar solo si cambias de dispositivo o pierdes datos.
 
@@ -165,6 +172,6 @@ Incluyen: `calcularResumenDia`, `normalizeDayData`, casos sin ventas, días pend
 
 ## Documentación adicional
 
-- **[REDISENO_UX_2026.md](./REDISENO_UX_2026.md)** — Rediseño UX 2026: diagnóstico, layout, paleta fintech, microinteracciones (solo HTML/CSS).
-- **[AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md)** — Auditoría técnica y de producto (marzo 2025), roadmap priorizado y propuestas de mejora estructural y de UX.
-- **[PROPUESTA_CAJA_2026.md](./PROPUESTA_CAJA_2026.md)** — Evolución a “Sistema de Caja Minimalista 2026”: inteligencia sin más campos, métricas derivadas, arquitectura limpia y visión dueño de negocio (sin ERP ni inventario).
+- **[AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md)** — Auditoría técnica y de producto, roadmap priorizado y propuestas de mejora.
+- **[REDISENO_UX_2026.md](./REDISENO_UX_2026.md)** — Rediseño UX 2026: diagnóstico, layout, paleta y microinteracciones.
+- **[PROPUESTA_CAJA_2026.md](./PROPUESTA_CAJA_2026.md)** — Propuesta “Sistema de Caja Minimalista 2026”: métricas derivadas, arquitectura y visión de negocio.
