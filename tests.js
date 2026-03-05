@@ -33,6 +33,36 @@ function testCalcularResumenDiaConPerdida() {
   assertEqual('calcularResumenDia.perdida.neto', r.neto, -5000);
 }
 
+function testGetEsDiaAnomalo() {
+  // Promedio 100
+  const prom = 100;
+  const pico = getEsDiaAnomalo(250, prom);   // 2.5x
+  const bajo = getEsDiaAnomalo(20, prom);    // 0.2x
+  const normal = getEsDiaAnomalo(110, prom); // ~1.1x
+  assertEqual('getEsDiaAnomalo.pico', pico, 'pico');
+  assertEqual('getEsDiaAnomalo.bajo', bajo, 'bajo');
+  assertEqual('getEsDiaAnomalo.normal', normal, null);
+}
+
+function testGetPromedioMovil7() {
+  const prom1 = getPromedioMovil7([10, 20, 30, 40, 50, 60, 70]);
+  const prom2 = getPromedioMovil7([100, 200]); // menos de 7 elementos
+  assertEqual('getPromedioMovil7.7dias', Math.round(prom1), 40);
+  assertEqual('getPromedioMovil7.2dias', prom2, 150);
+}
+
+function testGetDiasVerdes() {
+  const data = [
+    { neto:  10 },
+    { neto:   0 },
+    { neto: -20 },
+    { neto:  50 }
+  ];
+  const r = getDiasVerdes(data);
+  assertEqual('getDiasVerdes.total', r.total, 4);
+  assertEqual('getDiasVerdes.verdes', r.verdes, 3);
+}
+
 function testGetPendientesHastaHoyEnRangoDias() {
   const r = getPendientesHastaHoyEnRangoDias(30);
   const esArray = Array.isArray(r);
@@ -58,14 +88,33 @@ function testNormalizeDayData() {
   if (typeof r3.gastos[0].id !== 'number') console.error('FAIL normalizeDayData asigna id a gasto sin id', r3.gastos[0]);
 }
 
+function testParseMontoInput() {
+  assertEqual('parseMontoInput.vacío', Number.isNaN(parseMontoInput('')), true);
+  assertEqual('parseMontoInput.número', parseMontoInput('85000'), 85000);
+  assertEqual('parseMontoInput.con puntos', parseMontoInput('85.000'), 85000);
+  assertEqual('parseMontoInput.solo puntos', Number.isNaN(parseMontoInput('...')), true);
+}
+
+function testClampCorteDia() {
+  if (typeof clampCorteDia !== 'function') { console.log('skip clampCorteDia (solo en run-tests.js)'); return; }
+  assertEqual('clampCorteDia.válido', clampCorteDia(15, 31), 15);
+  assertEqual('clampCorteDia.menor a 1', clampCorteDia(0, 31), null);
+  assertEqual('clampCorteDia.mayor que días', clampCorteDia(32, 31), 31);
+}
+
 function runTests() {
   console.log('Ejecutando tests de Florería Elizabeth...');
   try {
     testCalcularResumenDia();
     testCalcularResumenDiaSinVentas();
     testCalcularResumenDiaConPerdida();
+    testGetEsDiaAnomalo();
+    testGetPromedioMovil7();
+    testGetDiasVerdes();
     testNormalizeDayData();
     testGetPendientesHastaHoyEnRangoDias();
+    testParseMontoInput();
+    testClampCorteDia();
     console.log('Tests finalizados.');
   } catch (e) {
     console.error('Error al ejecutar tests', e);

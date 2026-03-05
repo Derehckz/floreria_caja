@@ -82,6 +82,52 @@ function getRachaCierres(daysWithCerrado) {
   return racha;
 }
 
+/**
+ * Parsea un string de monto (ej. input de usuario). Quita espacios, puntos y comas; devuelve número o NaN.
+ * @param {string} raw - Valor en bruto
+ * @returns {number} - Número entero o NaN si no es válido
+ */
+function parseMontoInput(raw) {
+  if (!raw || typeof raw !== 'string') return NaN;
+  var limpio = raw.trim().replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '');
+  var n = parseInt(limpio, 10);
+  return isNaN(n) ? NaN : n;
+}
+
+/**
+ * Ajusta el día de corte al rango válido 1..diasEnMes.
+ * @param {number} d - Valor ingresado
+ * @param {number} diasEnMes - Días del mes (ej. 28, 30, 31)
+ * @returns {number|null} - Número entre 1 y diasEnMes, o null si d no es válido
+ */
+function clampCorteDia(d, diasEnMes) {
+  var n = parseInt(d, 10);
+  if (!diasEnMes || diasEnMes < 1) return null;
+  if (isNaN(n) || n < 1) return null;
+  return Math.min(Math.max(1, n), diasEnMes);
+}
+
+/**
+ * Totales hasta un día de corte a partir de una lista de días con ef, tb, gs.
+ * @param {Array<{dia: number, ef?: number, tb?: number, gs?: number}>} items - Lista de días (dia = número de día)
+ * @param {number} dia - Día de corte (incluido)
+ * @returns {{ totEf: number, totTb: number, totGs: number, totIng: number, totNeto: number, mrg: string }}
+ */
+function totalesHastaDia(items, dia) {
+  if (!items || !Array.isArray(items)) return { totEf: 0, totTb: 0, totGs: 0, totIng: 0, totNeto: 0, mrg: '0.0' };
+  var hasta = items.filter(function (item) { return item.dia <= dia; });
+  var totEf = 0, totTb = 0, totGs = 0;
+  hasta.forEach(function (item) {
+    totEf += item.ef || 0;
+    totTb += item.tb || 0;
+    totGs += item.gs || 0;
+  });
+  var totIng = totEf + totTb;
+  var totNeto = totIng - totGs;
+  var mrg = totIng > 0 ? ((totNeto / totIng) * 100).toFixed(1) : '0.0';
+  return { totEf: totEf, totTb: totTb, totGs: totGs, totIng: totIng, totNeto: totNeto, mrg: mrg };
+}
+
 // Export para tests en Node (runner automatizado)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -95,6 +141,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getTendenciaSemanalPct,
     getEsDiaAnomalo,
     getDiasVerdes,
-    getRachaCierres
+    getRachaCierres,
+    parseMontoInput,
+    clampCorteDia,
+    totalesHastaDia
   };
 }

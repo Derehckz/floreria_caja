@@ -32,22 +32,28 @@
   <button class="tab-btn" id="tab-mes" role="tab" aria-selected="false" aria-controls="view-mes" onclick="setTab('mes')" aria-label="Ver resumen del mes" title="Ver resumen del mes">
     <span class="tab-icon">📅</span>Mes
   </button>
+  <button class="tab-btn" id="tab-historico" role="tab" aria-selected="false" aria-controls="view-historico" onclick="setTab('historico')" aria-label="Ver histórico de meses" title="Ver histórico de meses">
+    <span class="tab-icon">📚</span>Histórico
+  </button>
 </div>
 
 <!-- ════════ BODY ════════ -->
 <div class="app-body" id="app-body">
 
   <!-- ══════ VISTA CAJA ══════ -->
-  <div class="view active" id="view-caja" role="tabpanel" aria-labelledby="tab-caja" data-caja-paso="1">
+  <div class="view view-caja active" id="view-caja" role="tabpanel" aria-labelledby="tab-caja" data-caja-paso="1">
 
-    <!-- Selector de día: solo visible en Caja, justo debajo de las pestañas -->
-    <div class="caja-date-nav" id="date-nav">
-      <button type="button" class="caja-dn-btn" onclick="cambiarDia(-1)" aria-label="Día anterior" title="Día anterior">‹</button>
-      <div class="caja-dn-center" onclick="irAHoy()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();irAHoy()}" aria-label="Ir al día de hoy" title="Ir al día de hoy">
-        <strong id="dn-day">—</strong>
-        <span><span id="dn-date">—</span><span id="dn-today-dot" class="today-pip" style="display:none"></span></span>
+    <!-- Selector de día + chip de estado -->
+    <div class="caja-date-wrap">
+      <div class="caja-date-nav" id="date-nav">
+        <button type="button" class="caja-dn-btn" onclick="cambiarDia(-1)" aria-label="Día anterior" title="Día anterior">‹</button>
+        <div class="caja-dn-center" onclick="irAHoy()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();irAHoy()}" aria-label="Ir al día de hoy" title="Ir al día de hoy">
+          <strong id="dn-day">—</strong>
+          <span><span id="dn-date">—</span><span id="dn-today-dot" class="today-pip" style="display:none"></span></span>
+        </div>
+        <button type="button" class="caja-dn-btn" id="btn-sig" onclick="cambiarDia(1)" aria-label="Día siguiente" title="Día siguiente">›</button>
       </div>
-      <button type="button" class="caja-dn-btn" id="btn-sig" onclick="cambiarDia(1)" aria-label="Día siguiente" title="Día siguiente">›</button>
+      <span class="caja-dia-status-chip" id="caja-dia-status-chip" aria-live="polite">—</span>
     </div>
 
     <div class="ro-banner" id="ro-banner">
@@ -66,16 +72,16 @@
     <div class="night-reminder" id="night-reminder" aria-live="polite">
       <span class="night-reminder-icon">🌙</span>
       <p>Son más de las 20:00 y hoy sigue pendiente de cierre.</p>
-      <button type="button" class="btn btn-sm btn-primary" onclick="irPasoCaja(4)">Ir a cerrar el día</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalCierre()">Ir a cerrar el día</button>
     </div>
 
     <!-- Hero: resultado del día (arriba) -->
     <div class="kpi-hero" id="kpi-hero" aria-live="polite">
-      <div class="kpi-hero-label">Resultado de hoy</div>
+      <div class="kpi-hero-label" id="kpi-hero-label">Resultado de hoy</div>
       <div class="kpi-hero-val zero" id="kpi-hero-val">$0</div>
     </div>
 
-    <!-- Resumen del día (4 KPIs); en móvil se colapsa a una línea en pasos 1-3 -->
+    <!-- Resumen del día: efectivo, Transbank, gastos -->
     <div class="kpi-row" id="kpi-row">
       <div class="kpi kpi-ef">
         <div class="kpi-lbl">Efectivo en caja</div>
@@ -96,9 +102,17 @@
     <div class="kpi-context" id="kpi-context" aria-live="polite"></div>
     <div class="kpi-chip" id="kpi-chip" aria-live="polite"></div>
 
+    <!-- Acción principal: abrir modal de cierre -->
+    <div class="caja-cta-cierre" id="caja-cta-cierre">
+      <button type="button" class="btn btn-lg btn-primary btn-ingresar-cierre" id="btn-ingresar-cierre" onclick="abrirModalCierre()" aria-label="Ingresar cierre del día">
+        <span class="btn-cierre-icon" aria-hidden="true">📝</span> Ingresar cierre
+      </button>
+      <p class="caja-cta-cierre-hint">Efectivo, Transbank, gastos y nota en un solo paso</p>
+    </div>
+
     <!-- Atajo: ir a revisar cuando ya hay efectivo y Transbank -->
     <div class="caja-atajo-revisar" id="caja-atajo-revisar" style="display:none">
-      <button type="button" class="btn btn-sm btn-ghost" onclick="irPasoCaja(4)">Ir a revisar y cerrar →</button>
+      <button type="button" class="btn btn-sm btn-ghost" onclick="abrirModalCierre()">Ir a revisar y cerrar →</button>
     </div>
 
     <!-- Navegación del cierre: chips + Anterior / Siguiente -->
@@ -129,7 +143,7 @@
           </div>
           <div class="input-row field-wrap-ef" id="field-wrap-ef">
             <div class="field">
-              <label>Monto ($)</label>
+              <label for="ef-in">Monto ($)</label>
               <input type="text" inputmode="numeric" id="ef-in" placeholder="Ej: 85000" min="0" autocomplete="off">
             </div>
             <button type="button" class="btn btn-md btn-green" onclick="guardarEfectivoYSiguiente()">Guardar y Siguiente</button>
@@ -153,7 +167,7 @@
           </div>
           <div class="input-row field-wrap-tb" id="field-wrap-tb">
             <div class="field">
-              <label>Monto ($)</label>
+              <label for="tb-in">Monto ($)</label>
               <input type="text" inputmode="numeric" id="tb-in" placeholder="Ej: 120000" min="0" autocomplete="off">
             </div>
             <button type="button" class="btn btn-md btn-blue" onclick="guardarTransbankYSiguiente()">Guardar y Siguiente</button>
@@ -172,12 +186,12 @@
         </div>
         <div class="card-body">
           <div class="field field-gastos-desc">
-            <label>Descripción</label>
+            <label for="gs-desc">Descripción</label>
             <input type="text" id="gs-desc" placeholder="Flores proveedor, Delivery, Arriendo…" maxlength="60">
           </div>
           <div class="input-row input-row-gastos">
             <div class="field">
-              <label>Monto ($)</label>
+              <label for="gs-mn">Monto ($)</label>
               <input type="number" id="gs-mn" placeholder="0" min="0" step="100">
             </div>
             <button class="btn btn-sm btn-primary" onclick="addGasto()">＋ Agregar</button>
@@ -211,7 +225,7 @@
       <!-- Botón principal del paso 3: siempre visible (la nota es opcional) -->
       <div class="caja-paso-3-actions">
         <p class="caja-paso-3-hint">La nota del día es opcional. Si no quieres escribir nada, solo continúa.</p>
-        <button type="button" class="btn btn-lg btn-primary" onclick="guardarNotaYSiguiente()">Ir a revisar resultado</button>
+        <button type="button" class="btn btn-lg btn-primary" onclick="guardarNotaYSiguiente()">Guardar y Siguiente</button>
       </div>
     </div>
 
@@ -250,18 +264,19 @@
             <div class="rc-bar-lbl"><span>Margen</span><span id="rc-mrg-pct">0%</span></div>
             <div class="rc-bar-track"><div class="rc-bar-fill" id="rc-mrg-fill" style="width:0%"></div></div>
           </div>
-          <div class="rc-week-summary" id="rc-week-summary"></div>
-          <div class="rc-sparkline" id="rc-sparkline" aria-label="Ingresos por día de la semana"></div>
+          <button type="button" class="btn btn-sm btn-ghost rc-week-toggle" id="rc-week-toggle" onclick="toggleRcWeekDetail()" style="display:none" aria-expanded="false" aria-controls="rc-week-detail">Ver detalle de la semana</button>
+          <div class="rc-week-detail" id="rc-week-detail" role="region" aria-labelledby="rc-week-toggle">
+            <div class="rc-week-summary" id="rc-week-summary"></div>
+            <div class="rc-sparkline" id="rc-sparkline" aria-label="Ingresos por día de la semana"></div>
+          </div>
           <div class="rc-quick-links">
-            <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(1)">Corregir efectivo en caja</button>
-            <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(2)">Corregir Transbank</button>
-            <button class="btn btn-sm btn-ghost" onclick="irPasoCaja(3)">Agregar / corregir gastos</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="abrirModalCierre()" aria-label="Editar efectivo, Transbank y gastos del día">✏️ Editar cierre del día</button>
           </div>
         </div>
       </div>
       <div class="caja-actions">
         <div class="caja-actions-primary">
-          <button class="btn btn-lg btn-green btn-cerrar-dia" id="btn-cerrar-dia" onclick="confirmarCierreDia()" aria-label="Marcar este día como cerrado" title="Marcar este día como cerrado">✅ Confirmar cierre del día</button>
+          <button class="btn btn-lg btn-green btn-cerrar-dia" id="btn-cerrar-dia" onclick="confirmarCierreDia()" aria-label="Guardar y cerrar este día" title="Guardar y cerrar este día">✅ Guardar y cerrar día</button>
         </div>
         <div class="caja-actions-secondary">
           <button class="btn btn-md btn-ghost btn-copy-resumen" onclick="copiarResumen()" aria-label="Copiar el resumen de caja" title="Copiar el resumen de caja">📋 Copiar resumen</button>
@@ -276,28 +291,31 @@
   <!-- ══════ VISTA MES ══════ -->
   <div class="view" id="view-mes" role="tabpanel" aria-labelledby="tab-mes">
 
-    <div class="mes-nav">
-      <button type="button" class="btn btn-ghost" onclick="cambiarMes(-1)" aria-label="Mes anterior">‹</button>
-      <h2 id="mes-titulo">—</h2>
-      <button type="button" class="btn btn-ghost" id="btn-mes-sig" onclick="cambiarMes(1)" aria-label="Mes siguiente">›</button>
-    </div>
-    <div class="mes-nav-hoy" id="mes-nav-hoy" style="display:none">
-      <button type="button" class="btn btn-sm btn-ghost" onclick="irAMesActual()">Ir a mes actual</button>
-    </div>
+    <!-- Cabecera: mes + atajo hoy + estado + cierre masivo -->
+    <section class="mes-block mes-header-block" aria-label="Navegación y estado del mes">
+      <div class="mes-nav">
+        <button type="button" class="btn btn-ghost" onclick="cambiarMes(-1)" aria-label="Mes anterior">‹</button>
+        <h2 id="mes-titulo">—</h2>
+        <button type="button" class="btn btn-ghost" id="btn-mes-sig" onclick="cambiarMes(1)" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="mes-nav-hoy" id="mes-nav-hoy" style="display:none">
+        <button type="button" class="btn btn-sm btn-ghost" onclick="irAMesActual()">Ir a mes actual</button>
+      </div>
+      <div class="mes-cierres-resumen">
+        <span id="mes-cierres-info">—</span>
+      </div>
+      <div class="mes-cierre-masivo" id="mes-cierre-masivo" style="display:none">
+        <button type="button" class="btn btn-sm btn-primary" id="btn-cierre-masivo" onclick="confirmarCierreMasivoMes()">
+          Cerrar <span id="mes-pendientes-count">0</span> pendientes del mes
+        </button>
+        <span class="mes-cierre-masivo-desc">Solo los días con datos ingresados (efectivo, transbank o gastos).</span>
+      </div>
+    </section>
 
-    <div class="mes-cierres-resumen">
-      <span id="mes-cierres-info">—</span>
-    </div>
-
-    <div class="mes-cierre-masivo" id="mes-cierre-masivo" style="display:none">
-      <button type="button" class="btn btn-sm btn-primary" id="btn-cierre-masivo" onclick="confirmarCierreMasivoMes()">
-        Cerrar <span id="mes-pendientes-count">0</span> pendientes del mes
-      </button>
-      <span class="mes-cierre-masivo-desc">Solo los días con datos ingresados (efectivo, transbank o gastos).</span>
-    </div>
-
-    <!-- KPIs mes (primero: lo que más importa al dueño) -->
-    <div class="mes-kpi">
+    <!-- Resumen del mes: lo que más importa a la vista -->
+    <section class="mes-summary-block" aria-labelledby="mes-summary-title" aria-live="polite">
+      <h3 id="mes-summary-title" class="mes-section-title">Resumen del mes</h3>
+      <div class="mes-kpi">
       <div class="mes-kpi-item mk-ing">
         <div class="mk-lbl">Total Ingresos</div>
         <div class="mk-val" id="mk-ing">$0</div>
@@ -319,31 +337,58 @@
         <div class="mk-sub" id="mk-mejor-dia">Sin datos</div>
       </div>
     </div>
+    </section>
 
-    <div class="mes-cut">
-      <span><strong>Día de corte</strong> (1–31) <em class="mes-cut-optional">— opcional</em>:</span>
-      <input type="number" id="mes-corte-dia" min="1" max="31" aria-label="Día de corte para ver totales acumulados hasta ese día" oninput="setMesCorteDia(this.value)">
-      <span id="mes-corte-resumen">Totales del mes solo hasta el día que elijas.</span>
-      <span class="mes-cut-hint">Si no eliges día, se usan hoy o el último día con datos.</span>
-    </div>
-    <div class="mes-progreso-dia hidden" id="mes-progreso-dia"></div>
-    <div class="mes-esta-semana hidden" id="mes-esta-semana"></div>
-
-    <div class="mes-resumen-negocio" id="mes-resumen-negocio" aria-live="polite"></div>
-    <div class="mes-salud hidden" id="mes-salud"></div>
-
-    <div class="mes-notas-card">
-      <h3>Notas importantes del mes</h3>
-      <div id="mes-notas-list" class="mes-notas-list">
-        <div class="mes-notas-empty">Aún no hay notas guardadas este mes.</div>
+    <!-- Tarjeta 1: Totales hasta un día (día de corte + avance + esta semana) -->
+    <section class="mes-double-card mes-totales-card" aria-labelledby="mes-totales-title">
+      <h2 id="mes-totales-title" class="mes-card-main-title">Totales hasta un día</h2>
+      <div class="mes-card-block">
+        <h3 class="mes-card-block-title">Día de corte</h3>
+        <div class="mes-cut">
+          <span class="mes-cut-lbl">(1–31) <em class="mes-cut-optional">opcional</em></span>
+          <input type="number" id="mes-corte-dia" min="1" max="31" aria-label="Día de corte para ver totales acumulados hasta ese día" oninput="setMesCorteDia(this.value)">
+          <span id="mes-corte-resumen" class="mes-cut-resumen">Totales del mes solo hasta el día que elijas.</span>
+          <span class="mes-cut-hint">Si no eliges día, se usan hoy o el último día con datos.</span>
+        </div>
       </div>
-    </div>
+      <div class="mes-card-block mes-card-block--progreso">
+        <h3 class="mes-card-block-title">Avance del mes</h3>
+        <div class="mes-progreso-dia hidden" id="mes-progreso-dia"></div>
+      </div>
+      <div class="mes-card-block mes-card-block--semana">
+        <h3 class="mes-card-block-title">Esta semana</h3>
+        <div class="mes-esta-semana hidden" id="mes-esta-semana"></div>
+      </div>
+    </section>
 
-    <!-- Lista de días del mes (arriba para acceso rápido) -->
+    <!-- Tarjeta 2: Resumen del mes + Hábitos de caja -->
+    <section class="mes-double-card mes-resumen-habitos-card" aria-labelledby="mes-resumen-habitos-title">
+      <h2 id="mes-resumen-habitos-title" class="mes-card-main-title">Resumen y hábitos</h2>
+      <div class="mes-card-block mes-card-block--resumen">
+        <h3 class="mes-card-block-title">Resumen del mes</h3>
+        <div class="mes-resumen-negocio" id="mes-resumen-negocio" aria-live="polite"></div>
+      </div>
+      <div class="mes-card-block mes-card-block--habitos">
+        <h3 class="mes-card-block-title">Hábitos de caja</h3>
+        <div class="mes-salud hidden" id="mes-salud"></div>
+      </div>
+    </section>
+
+    <section class="mes-notas-section" aria-labelledby="mes-notas-heading">
+      <div class="mes-notas-card">
+        <h3 id="mes-notas-heading">Notas importantes del mes</h3>
+        <div id="mes-notas-list" class="mes-notas-list">
+          <div class="mes-notas-empty">Aún no hay notas guardadas este mes.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lista de días del mes -->
+    <section class="mes-dias-section" aria-labelledby="mes-dias-heading">
     <div class="card mes-dias-card">
       <div class="card-head">
         <div class="ch-icon ch-cfg">📆</div>
-        <div><h2>Días del Mes</h2><p>Toca un día (o Enter con teclado) para verlo en la caja diaria</p></div>
+        <div><h2 id="mes-dias-heading">Días del Mes</h2><p>Toca un día (o Enter con teclado) para verlo en la caja diaria</p></div>
       </div>
       <div class="card-body card-body-dias">
         <table class="dias-table">
@@ -367,6 +412,7 @@
         <div class="dias-legend">Los datos históricos se guardan solos. Toca un día o pulsa Enter para abrirlo en la pestaña Caja.</div>
       </div>
     </div>
+    </section>
 
     <div class="mes-advanced-toggle">
       <button class="btn btn-full btn-ghost" id="btn-mes-adv" onclick="toggleMesAdvanced()">Ver análisis avanzado</button>
@@ -435,6 +481,82 @@
     </div><!-- /mes-advanced -->
 
   </div><!-- /view-mes -->
+
+  <!-- ══════ VISTA HISTÓRICO ══════ -->
+  <div class="view" id="view-historico" role="tabpanel" aria-labelledby="tab-historico">
+
+    <div class="hist-header">
+      <h2>Histórico de meses</h2>
+      <p>Resumen de todos los meses registrados. Toca un mes para verlo en detalle.</p>
+    </div>
+
+    <!-- KPI principal: total ganado (estilo financiero) -->
+    <div class="hist-hero" aria-labelledby="hist-hero-label">
+      <div class="hist-hero-label" id="hist-hero-label">Total ganado</div>
+      <div class="hist-hero-val" id="hist-total-neto">$0</div>
+      <div class="hist-hero-sub" id="hist-hero-sub">En todos los meses registrados</div>
+    </div>
+
+    <!-- Comparativa mejor vs peor mes con barras -->
+    <div class="hist-comparativa" id="hist-comparativa" aria-labelledby="hist-comp-title">
+      <h3 class="hist-comp-title" id="hist-comp-title">Mejor y peor mes</h3>
+      <div class="hist-comp-row hist-comp-mejor">
+        <span class="hist-comp-lbl">Mes más fuerte</span>
+        <div class="hist-comp-bar-wrap">
+          <div class="hist-comp-bar-track"><div class="hist-comp-bar-fill hist-comp-bar--ok" id="hist-bar-mejor" style="width:0%"></div></div>
+          <span class="hist-comp-val" id="hist-mejor-mes">—</span>
+        </div>
+      </div>
+      <div class="hist-comp-row hist-comp-peor">
+        <span class="hist-comp-lbl">Mes más débil</span>
+        <div class="hist-comp-bar-wrap">
+          <div class="hist-comp-bar-track"><div class="hist-comp-bar-fill hist-comp-bar--danger" id="hist-bar-peor" style="width:0%"></div></div>
+          <span class="hist-comp-val" id="hist-peor-mes">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hist-filters">
+      <label for="hist-year-filter">Año:</label>
+      <select id="hist-year-filter" onchange="renderHistorico()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+
+    <div class="card hist-card">
+      <div class="card-head">
+        <div class="ch-icon ch-cfg">📚</div>
+        <div>
+          <h2>Meses registrados</h2>
+          <p>Toca un mes para abrirlo en la pestaña Mes</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <table class="dias-table hist-table">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>Ingresos</th>
+              <th>Gastos</th>
+              <th>Neto</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body">
+            <tr>
+              <td colspan="5" class="hist-empty">
+                Aún no hay datos históricos. A medida que cierres la caja se irán mostrando aquí los meses.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="hist-legend">
+          Los datos históricos se calculan a partir de todos los días guardados. Toca un mes para verlo en detalle en la pestaña Mes.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /view-historico -->
 
   <!-- ══════ VISTA RESPALDO ══════ -->
   <div class="view" id="view-backup" role="tabpanel" aria-labelledby="header-respaldo-btn" aria-label="Respaldo y recuperación de datos">
@@ -509,7 +631,59 @@
 
 </div><!-- /app-body -->
 
-<!-- MODAL -->
+<!-- MODAL CIERRE DEL DÍA (un solo paso) -->
+<div class="overlay overlay-cierre" id="overlay-cierre" role="dialog" aria-modal="true" aria-labelledby="modal-cierre-title" aria-describedby="modal-cierre-fecha">
+  <div class="modal-cierre" id="modal-cierre">
+    <div class="modal-cierre-header">
+      <div class="modal-cierre-title-wrap">
+        <h2 id="modal-cierre-title">Cierre del día</h2>
+        <p id="modal-cierre-fecha" class="modal-cierre-fecha">—</p>
+      </div>
+      <button type="button" class="modal-cierre-close" onclick="cerrarModalCierre()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-cierre-body">
+      <div class="mcierre-row mcierre-row-dos">
+        <div class="mcierre-block">
+          <label for="modal-ef-in">💵 Efectivo en caja</label>
+          <input type="text" inputmode="numeric" id="modal-ef-in" placeholder="0" autocomplete="off" aria-describedby="modal-ef-hint">
+          <span id="modal-ef-hint" class="mcierre-hint">Total que cuentas en billetes</span>
+        </div>
+        <div class="mcierre-block">
+          <label for="modal-tb-in">💳 Transbank</label>
+          <input type="text" inputmode="numeric" id="modal-tb-in" placeholder="0" autocomplete="off" aria-describedby="modal-tb-hint">
+          <span id="modal-tb-hint" class="mcierre-hint">Total del cierre / boletín</span>
+        </div>
+      </div>
+      <div class="mcierre-section">
+        <h3 class="mcierre-section-title">🧾 Gastos del día</h3>
+        <div class="mcierre-gastos-add">
+          <input type="text" id="modal-gs-desc" placeholder="Descripción (ej. flores, delivery)" maxlength="60" aria-label="Descripción del gasto">
+          <input type="text" inputmode="numeric" id="modal-gs-monto" placeholder="Monto" aria-label="Monto del gasto">
+          <button type="button" class="btn btn-primary btn-add-gasto-modal" onclick="addGastoEnModal()">＋ Agregar</button>
+        </div>
+        <div class="mcierre-gastos-list" id="modal-gastos-list" aria-label="Lista de gastos">
+          <div class="mcierre-gastos-empty" id="modal-gastos-empty">Sin gastos. Agrega cada egreso arriba.</div>
+        </div>
+        <div class="mcierre-gastos-total" id="modal-gastos-total-wrap" style="display:none">
+          <span>Total gastos</span>
+          <strong id="modal-gastos-total">$0</strong>
+        </div>
+      </div>
+      <div class="mcierre-block mcierre-nota">
+        <label for="modal-nota-in">📝 Nota del día</label>
+        <textarea id="modal-nota-in" placeholder="Observaciones, eventos especiales (opcional)…" rows="3" aria-describedby="modal-nota-hint"></textarea>
+        <span id="modal-nota-hint" class="mcierre-hint">Opcional</span>
+      </div>
+    </div>
+    <div class="modal-cierre-footer">
+      <button type="button" class="btn btn-lg btn-green modal-cierre-btn-save" onclick="guardarCierreDesdeModal()">Guardar sin cerrar</button>
+      <button type="button" class="btn btn-md btn-primary modal-cierre-btn-cerrar" onclick="cerrarDiaDesdeModal()">Guardar y cerrar día</button>
+      <button type="button" class="btn btn-ghost modal-cierre-btn-cancel" onclick="cerrarModalCierre()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LIMPIAR -->
 <div class="overlay" id="overlay">
   <div class="modal modal--destructive" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-limpiar-txt">
     <h3 id="modal-title">¿Limpiar este día? 🗑️</h3>

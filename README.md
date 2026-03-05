@@ -8,15 +8,11 @@ Aplicación web sencilla (PWA) para llevar la **caja diaria** de una florería: 
 
 ## Estado del proyecto
 
-- **Funcional:** La app está operativa con todas las funciones descritas más abajo (Caja, Mes, Respaldo, wizard de cierre, KPIs, backup/restore).
+- **Funcional:** La app está operativa con todas las funciones descritas más abajo: **Caja** (wizard de cierre en pasos, KPIs, recordatorio nocturno, día sin ventas), **Mes** (resumen, día de corte, avance, esta semana, hábitos de caja, cierre masivo de pendientes), **Histórico** (total ganado, mejor/peor mes, tabla de meses por año) y **Respaldo** (desde el botón del header: backup/restore, recordatorio de último backup).
+- **Navegación:** Tres pestañas en la barra: **Caja**, **Mes**, **Histórico**. El **Respaldo** se abre desde el botón 💾 del header.
 - **Arquitectura actual:** Lógica de dominio y almacenamiento en módulos separados (`js/domain.js`, `js/storage.js`); `app.js` con estado global y UI; estilos en `styles.css`. Tests automatizados con `npm test` (Node) y tests manuales en navegador (`tests.js`).
-- **Mejoras ya aplicadas:** Normalización de datos al cargar (`normalizeDayData`), manejo de errores en `loadDay` (toast + `console.warn`), validación de backup antes de restaurar, PWA con Service Worker registrado y caché de todos los assets.
-- **Auditoría y roadmap:** En [AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md) hay una auditoría técnica y de producto (marzo 2025) con:
-  - Recomendaciones de refactor (extraer `domain.js`, `storage.js`, tests automatizados) — **ya aplicadas**.
-  - Bugs y mejoras priorizadas (crítico / importante / evolutivo).
-  - Ideas de UX, seguridad y evolución (categorías de gastos, vista previa al restaurar, exportar CSV, etc.).
-
-Para ver el detalle de qué está hecho y qué sigue pendiente, consulta ese documento.
+- **Mejoras ya aplicadas:** Normalización de datos al cargar (`normalizeDayData`), manejo de errores en `loadDay` (toast + `console.warn`), validación de backup antes de restaurar, PWA con Service Worker registrado y caché de todos los assets, recordatorio si no se cerró el día (después de las 20:00), cierre masivo de días pendientes del mes, vista Histórico con filtro por año.
+- **Auditoría y roadmap:** En [AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md) hay una auditoría técnica y de producto (marzo 2025) con recomendaciones (ya aplicadas en gran parte), bugs priorizados e ideas de evolución. Consulta ese documento para el detalle.
 
 ---
 
@@ -36,28 +32,34 @@ Abre en el navegador: **http://localhost:8000/index.html**
 
 ### Caja del día (pestaña **Caja**)
 
-- **Ingresos:** total de **efectivo** (billetes en caja) y total **Tarjeta / Transbank** (según cierre o papelito).
-- **Gastos del día:** cada egreso con descripción y monto.
-- **Nota del día:** observaciones opcionales.
-- **Resultado del día:** ingresos, gastos, neto, margen y resumen de la semana actual.
-- **KPIs visibles:** efectivo, tarjeta, gastos, resultado del día. Si hay días anteriores en el mes, se muestra **promedio diario** y si hoy vas sobre o bajo ese promedio.
-- **Acciones:** Copiar resumen, enviar por WhatsApp, **Confirmar cierre del día** (también se puede cerrar días sin ventas).
+- **Navegación de día:** selector con día anterior/siguiente e “Ir a hoy”; chip de estado (Día cerrado / Día pendiente / Sin datos). Banner cuando estás viendo un día pasado.
+- **Recordatorio nocturno:** si son más de las 20:00 y hoy sigue pendiente, se muestra un aviso para ir a cerrar el día.
+- **Cierre en wizard (pasos):** Paso 1 → Efectivo y Transbank; Paso 2 → Gastos del día; Paso 3 → Nota del día (opcional); Paso 4 → Resultado del día y acciones. Opción **Cerrar día sin ventas** si no abriste.
+- **KPIs en vista:** resultado del día (hero), efectivo, Transbank, gastos; contexto (promedio diario del mes, sobre/bajo promedio).
+- **Acciones:** Ingresar cierre, Copiar resumen, WhatsApp, **Guardar y cerrar día**, Limpiar día.
 
 ### Resumen mensual (pestaña **Mes**)
 
-- Totales: **Ingresos**, **Gastos**, **Lo que ganaste** (neto), **Mejor día**.
-- **Resumen para el negocio:** promedio por día abierto, proyección al cierre del mes, comparativa vs mes anterior (mismo período).
-- Lista de **días del mes** con ingresos, gastos, neto y estado (Cerrado / Pendiente). Click en un día para abrirlo en Caja.
-- **Notas importantes del mes** y **análisis avanzado** (Efectivo vs Transbank, ingresos por semana, tabla semanal, top 3 días).
+- **Cabecera:** navegación de mes, “Ir a mes actual”, resumen de cierres y botón **Cerrar pendientes del mes** (solo días con datos).
+- **Resumen del mes:** Total Ingresos, Total Gastos, Lo que ganaste (neto), Mejor día.
+- **Totales hasta un día:** día de corte (1–31) opcional, avance del mes, “Esta semana”.
+- **Resumen y hábitos:** resumen para el negocio (promedio, proyección, comparativa) y hábitos de caja.
+- **Notas importantes del mes** y tabla **Días del mes** (click en un día para abrirlo en Caja).
 
-### Respaldo (pestaña **Respaldo**)
+### Histórico (pestaña **Histórico**)
 
-- **Estado:** días registrados, primer/último registro, tamaño aproximado, **último backup** (fecha/hora).
+- **Total ganado** en todos los meses registrados.
+- **Mejor y peor mes** con barras comparativas.
+- **Filtro por año** (o “Todos”).
+- **Tabla de meses** con Ingresos, Gastos, Neto y estado; click en un mes para abrirlo en la pestaña Mes.
+
+### Respaldo (botón 💾 del **header**)
+
+- **Estado:** días registrados, primer/último registro, tamaño aproximado, **último backup** (fecha/hora). Recordatorio si nunca has descargado o hace tiempo.
 - **Descargar backup** en `.json` (Guardar en Drive o WhatsApp).
 - **Restaurar backup** desde un `.json` (con confirmación; reemplaza los datos actuales).
-- **Compartir resumen del día** por WhatsApp.
 
-### Histórico y pendientes
+### Pendientes
 
 - Los días se guardan por clave `fe_YYYY-MM-DD` en `localStorage`.
 - **Banner de pendientes** (últimos 30 días) avisa si hay días sin cerrar y permite ir al primero.
@@ -84,6 +86,8 @@ Abre en el navegador: **http://localhost:8000/index.html**
 | `tests.js`       | Tests manuales en navegador (`runTests()`)    |
 | `run-tests.js`   | Runner de tests automatizados (Node)         |
 | `package.json`   | Script `npm test` para tests de dominio      |
+
+**Orden de carga de scripts (index.html):** `js/domain.js` → `js/storage.js` → `app.js` → `tests.js`. El dominio expone funciones puras (fechas, resumen, validación de backup, `parseMontoInput`, `clampCorteDia`, etc.). Storage: `loadDay`, `saveDay`, `allDayKeys`, `getDaysOfMonth`. La app mantiene el **estado global** en `state` (`app.js`): `cur`, `curMes`, `mesCorteDia`, `cajaPaso`, pasos del wizard, `lastSavedAt`, `S`. La UI (Caja, Mes, Histórico, Respaldo) lee y escribe en `state`; los `onclick` del HTML llaman a funciones globales.
 
 ---
 
@@ -129,7 +133,7 @@ npm test
 runTests()
 ```
 
-Incluyen: `calcularResumenDia`, `normalizeDayData`, casos sin ventas, días pendientes, `getPendientesHastaHoyEnRangoDias`.
+Incluyen: `calcularResumenDia`, `normalizeDayData`, casos sin ventas, días pendientes, `getPendientesHastaHoyEnRangoDias`, `parseMontoInput`, `clampCorteDia` (en Node también vía `npm test`).
 
 ---
 
@@ -145,10 +149,9 @@ Incluyen: `calcularResumenDia`, `normalizeDayData`, casos sin ventas, días pend
 
 ## Ideas para más adelante
 
-- Recordatorio si no se cerró el día.
 - Foto del comprobante Transbank por día.
-- Marcar “día sin venta” (no abriste).
 - Temporadas (14 feb, día de la madre) para ver picos.
+- Exportar CSV, categorías de gastos, vista previa al restaurar backup.
 
 ---
 

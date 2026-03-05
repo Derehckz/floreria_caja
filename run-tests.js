@@ -88,6 +88,35 @@ assertEqual('getDiasVerdes.verdes', verdes.verdes, 2);
 assertEqual('getRachaCierres.vacío', domain.getRachaCierres([]), 0);
 assertEqual('getRachaCierres.racha3', domain.getRachaCierres([{ cerrado: true }, { cerrado: true }, { cerrado: true }, { cerrado: false }]), 3);
 
+// parseMontoInput
+assertEqual('parseMontoInput.vacío', Number.isNaN(domain.parseMontoInput('')), true);
+assertEqual('parseMontoInput.null', Number.isNaN(domain.parseMontoInput(null)), true);
+assertEqual('parseMontoInput.número', domain.parseMontoInput('85000'), 85000);
+assertEqual('parseMontoInput.con puntos', domain.parseMontoInput('85.000'), 85000);
+assertEqual('parseMontoInput.solo puntos', Number.isNaN(domain.parseMontoInput('...')), true);
+assertEqual('parseMontoInput.negativo', domain.parseMontoInput('-100'), -100);
+
+// clampCorteDia
+assertEqual('clampCorteDia.válido', domain.clampCorteDia(15, 31), 15);
+assertEqual('clampCorteDia.menor a 1', domain.clampCorteDia(0, 31), null);
+assertEqual('clampCorteDia.mayor que días', domain.clampCorteDia(32, 31), 31);
+assertEqual('clampCorteDia.clamp 1', domain.clampCorteDia(1, 28), 1);
+assertEqual('clampCorteDia.inválido', domain.clampCorteDia('x', 31), null);
+
+// totalesHastaDia
+const itemsMes = [
+  { dia: 1, ef: 10000, tb: 5000, gs: 2000 },
+  { dia: 2, ef: 8000, tb: 4000, gs: 1000 },
+  { dia: 3, ef: 12000, tb: 6000, gs: 3000 }
+];
+const t1 = domain.totalesHastaDia(itemsMes, 2);
+assertEqual('totalesHastaDia.hasta dia 2 totIng', t1.totIng, 10000 + 5000 + 8000 + 4000);
+assertEqual('totalesHastaDia.hasta dia 2 totGs', t1.totGs, 2000 + 1000);
+assertEqual('totalesHastaDia.hasta dia 2 totNeto', t1.totNeto, 27000 - 3000);
+const t2 = domain.totalesHastaDia(itemsMes, 5);
+assertEqual('totalesHastaDia.hasta dia 5 totIng', t2.totIng, 45000);
+assertEqual('totalesHastaDia.vacío', domain.totalesHastaDia([], 10).totIng, 0);
+
 if (failed > 0) {
   console.error('\n' + failed + ' test(s) fallaron.');
   process.exit(1);

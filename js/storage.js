@@ -17,16 +17,19 @@ function loadDay(o) {
   }
 }
 
+/** Guarda el día en localStorage. Devuelve true si guardó bien, false si falló (QuotaExceeded, etc.). */
 function saveDay(o, data) {
   try {
     var normalized = normalizeDayData(data);
     localStorage.setItem(PREFIX + dateKey(o), JSON.stringify(normalized));
+    return true;
   } catch (err) {
     if (err && (err.name === 'QuotaExceededError' || err.code === 22)) {
       if (typeof toast === 'function') toast('Memoria llena. Haz un backup.');
     } else {
       if (typeof toast === 'function') toast('No se pudo guardar.');
     }
+    return false;
   }
 }
 
