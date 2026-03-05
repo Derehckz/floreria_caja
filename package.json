@@ -1,0 +1,9 @@
+{
+  "name": "floreria-elizabeth-caja",
+  "description": "Caja diaria PWA para Florería Elizabeth: efectivo, Transbank, gastos y resumen.",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node run-tests.js"
+  }
+}

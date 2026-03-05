@@ -6,6 +6,20 @@ Aplicación web sencilla (PWA) para llevar la **caja diaria** de una florería: 
 
 ---
 
+## Estado del proyecto
+
+- **Funcional:** La app está operativa con todas las funciones descritas más abajo (Caja, Mes, Respaldo, wizard de cierre, KPIs, backup/restore).
+- **Arquitectura actual:** Lógica de dominio y almacenamiento en módulos separados (`js/domain.js`, `js/storage.js`); `app.js` con estado global y UI; estilos en `styles.css`. Tests automatizados con `npm test` (Node) y tests manuales en navegador (`tests.js`).
+- **Mejoras ya aplicadas:** Normalización de datos al cargar (`normalizeDayData`), manejo de errores en `loadDay` (toast + `console.warn`), validación de backup antes de restaurar, PWA con Service Worker registrado y caché de todos los assets.
+- **Auditoría y roadmap:** En [AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md) hay una auditoría técnica y de producto (marzo 2025) con:
+  - Recomendaciones de refactor (extraer `domain.js`, `storage.js`, tests automatizados) — **ya aplicadas**.
+  - Bugs y mejoras priorizadas (crítico / importante / evolutivo).
+  - Ideas de UX, seguridad y evolución (categorías de gastos, vista previa al restaurar, exportar CSV, etc.).
+
+Para ver el detalle de qué está hecho y qué sigue pendiente, consulta ese documento.
+
+---
+
 ## Clonar y ejecutar
 
 ```bash
@@ -58,14 +72,18 @@ Abre en el navegador: **http://localhost:8000/index.html**
 
 **Archivos:**
 
-| Archivo        | Descripción                          |
-|----------------|--------------------------------------|
-| `index.html`   | Estructura y vistas                  |
-| `styles.css`   | Estilos y diseño responsivo          |
-| `app.js`       | Lógica (caja, mes, backup, UI)       |
-| `sw.js`        | Service worker                       |
-| `manifest.json`| PWA (nombre, icono, tema)            |
-| `tests.js`     | Tests manuales de lógica             |
+| Archivo          | Descripción                                  |
+|------------------|----------------------------------------------|
+| `index.html`     | Estructura y vistas                          |
+| `styles.css`     | Estilos y diseño responsivo (WCAG AA)        |
+| `js/domain.js`   | Lógica de dominio (fechas, resumen, backup)  |
+| `js/storage.js`  | Persistencia en `localStorage`                |
+| `app.js`         | Estado global, UI (caja, mes, backup)        |
+| `sw.js`          | Service worker (caché versionada)            |
+| `manifest.json`  | PWA (nombre, icono, theme-color)              |
+| `tests.js`       | Tests manuales en navegador (`runTests()`)    |
+| `run-tests.js`   | Runner de tests automatizados (Node)         |
+| `package.json`   | Script `npm test` para tests de dominio      |
 
 ---
 
@@ -97,15 +115,21 @@ Abre en el navegador: **http://localhost:8000/index.html**
 
 ---
 
-## Tests manuales
+## Tests
 
-En la consola del navegador (F12), con la app cargada:
+**Automáticos (Node):** ejecuta los tests de la lógica de dominio sin abrir el navegador:
+
+```bash
+npm test
+```
+
+**Manuales (navegador):** en la consola (F12), con la app cargada:
 
 ```javascript
 runTests()
 ```
 
-Incluyen: `calcularResumenDia`, casos sin ventas, días pendientes.
+Incluyen: `calcularResumenDia`, `normalizeDayData`, casos sin ventas, días pendientes, `getPendientesHastaHoyEnRangoDias`.
 
 ---
 
@@ -114,6 +138,8 @@ Incluyen: `calcularResumenDia`, casos sin ventas, días pendientes.
 - Tabs con ARIA; cambio con flechas ← → con foco en la pestaña.
 - Modal “Limpiar día” con `role="dialog"` y focus trap.
 - Toast y mensajes con `aria-live` donde aplica.
+- Contraste de texto ajustado a WCAG AA (`--ink-soft`).
+- Foco visible con `:focus-visible` para navegación por teclado.
 
 ---
 
@@ -130,4 +156,12 @@ Incluyen: `calcularResumenDia`, casos sin ventas, días pendientes.
 
 - Datos **solo en el navegador**. Sin backup se pierden al borrar caché o cambiar dispositivo.
 - No hay multiusuario ni sincronización en la nube.
-- Tests manuales (sin runner automatizado).
+- Tests: runner automatizado (`npm test`) para lógica de dominio; tests manuales en navegador para flujos con `localStorage`.
+
+---
+
+## Documentación adicional
+
+- **[REDISENO_UX_2026.md](./REDISENO_UX_2026.md)** — Rediseño UX 2026: diagnóstico, layout, paleta fintech, microinteracciones (solo HTML/CSS).
+- **[AUDITORIA_FLORERIA_ELIZABETH.md](./AUDITORIA_FLORERIA_ELIZABETH.md)** — Auditoría técnica y de producto (marzo 2025), roadmap priorizado y propuestas de mejora estructural y de UX.
+- **[PROPUESTA_CAJA_2026.md](./PROPUESTA_CAJA_2026.md)** — Evolución a “Sistema de Caja Minimalista 2026”: inteligencia sin más campos, métricas derivadas, arquitectura limpia y visión dueño de negocio (sin ERP ni inventario).

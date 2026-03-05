@@ -1,6 +1,15 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = 'floreria-static-' + CACHE_VERSION;
-const ASSETS = ['index.html', 'styles.css', 'app.js', 'manifest.json'];
+const ASSETS = [
+  'index.html',
+  'styles.css',
+  'app.js',
+  'tests.js',
+  'manifest.json',
+  'sw.js',
+  'js/domain.js',
+  'js/storage.js'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -18,9 +27,12 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (u.origin !== location.origin || !ASSETS.some((a) => u.pathname.endsWith(a))) return;
+  const pathMatch = ASSETS.some((a) => u.pathname.endsWith(a) || u.pathname.endsWith('/' + a));
+  if (u.origin !== location.origin || !pathMatch) return;
+  const isHtml = u.pathname.endsWith('.html') || u.pathname.endsWith('/');
+  const fetchOpts = isHtml ? { cache: 'reload' } : {};
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, fetchOpts)
       .then((r) => {
         const clone = r.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
