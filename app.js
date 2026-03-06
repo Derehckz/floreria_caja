@@ -780,6 +780,12 @@ function renderMesTitulo() {
   if (navHoy) navHoy.style.display = (y !== hoy.y || m !== hoy.m) ? 'block' : 'none';
 }
 
+/** Stub: bloque opcional "Resumen negocio" (oculto por defecto). Evita ReferenceError y permite que renderMes continúe con Días del mes y Semanas. */
+function renderMesResumenNegocio(y, m, days, dayData, totIng, maxDiaDatos) {
+  const el = document.querySelector('.mes-resumen-negocio');
+  if (el) el.classList.remove('show');
+}
+
 function renderMesKPIs(dayData, days, totIng, totGs, totNeto, mrg, numGs, mejor) {
   const diasCerrados = dayData.filter(d => d.cerrado).length;
   const diasPend     = days.length - diasCerrados;
@@ -901,6 +907,11 @@ function renderMesAvanzado(dayData, totEf, totTb, totIng, semanas, days, y, m) {
   const tbody = document.getElementById('semanas-body');
   const topDiasEl = document.getElementById('top-dias');
   if (!tbody) return;
+  if (!semanas || semanas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--ink-soft);font-style:italic">Sin datos para este mes</td></tr>';
+    if (topDiasEl) topDiasEl.innerHTML = '<div class="empty-note">Sin datos para este mes</div>';
+    return;
+  }
   const maxNeto = Math.max(...semanas.map(s=>s.neto));
   tbody.innerHTML = semanas.map((s,i) => {
     const netoClass = s.neto >= 0 ? 'td-neto-pos' : 'td-neto-neg';
